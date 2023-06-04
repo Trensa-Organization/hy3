@@ -4,6 +4,7 @@
 
 #include <hyprland/src/Compositor.hpp>
 #include <hyprland/src/plugins/PluginAPI.hpp>
+#include <iostream>
 
 #include <sstream>
 
@@ -1148,7 +1149,28 @@ void Hy3Layout::shiftFocus(int workspace, ShiftDirection direction) {
 
 	Hy3Node* target;
 	if ((target = this->shiftOrGetFocus(*node, direction, false, false))) {
-		g_pCompositor->focusWindow(target->data.as_window);
+        target->focus();
+
+		std::cout << "Marking focus" << std::endl;
+
+		// If this node is in a group
+		if (target->parent != nullptr) {
+			double split_ratio = 0.05;
+			auto& children = target->parent->data.as_group.children;
+			std::cout << "Found " << children.size() << " children" << std::endl;
+			for (auto&& child : children) {
+				if (child != target) {
+					child->size_ratio = split_ratio;
+					child->recalcSizePosRecursive(true);
+				}
+				else {
+					child->size_ratio = 1.0 - (split_ratio * children.size());
+					child->recalcSizePosRecursive(true);
+				}
+				std::cout << "Ratio " << child->size_ratio << " size " << child->size.y << std::endl;
+				this->applyNodeDataToWindow(child, true);
+			}
+		}
 	}
 }
 
