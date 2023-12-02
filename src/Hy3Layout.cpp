@@ -95,8 +95,11 @@ void Hy3Layout::onWindowCreatedTiling(CWindow* window, eDirection) {
 	Hy3Node* opening_into;
 	Hy3Node* opening_after = nullptr;
 
-	if (monitor->activeWorkspace != -1) {
-		auto* root = this->getWorkspaceRootGroup(monitor->activeWorkspace);
+	int specialWorkspaceID = monitor->specialWorkspaceID;
+	int workspace_id = specialWorkspaceID ? specialWorkspaceID : monitor->activeWorkspace;
+
+	if (workspace_id != -1) {
+		auto* root = this->getWorkspaceRootGroup(workspace_id);
 
 		if (root != nullptr) {
 			opening_after = root->getFocusedNode();
@@ -1390,7 +1393,7 @@ void Hy3Layout::applyNodeDataToWindow(Hy3Node* node, bool no_animation) {
 		);
 	}
 
-	if (monitor == nullptr) {
+	if (!g_pCompositor->isWorkspaceSpecial(node->workspace_id) && monitor == nullptr) {
 		hy3_log(
 		    ERR,
 		    "node {:x}'s workspace has no associated monitor, cannot apply node data",
@@ -1461,6 +1464,14 @@ void Hy3Layout::applyNodeDataToWindow(Hy3Node* node, bool no_animation) {
 		const auto reserved_area = window->getFullWindowReservedArea();
 		calcPos = calcPos + reserved_area.topLeft;
 		calcSize = calcSize - (reserved_area.topLeft - reserved_area.bottomRight);
+
+		if (g_pCompositor->isWorkspaceSpecial(window->m_iWorkspaceID)) {
+			// adjust for special workspaces
+			static const auto* scalefactor
+			    = &HyprlandAPI::getConfigValue(PHANDLE, "plugin:hy3:special_scale_factor")->floatValue;
+			calcPos = calcPos + (calcSize - calcSize * *scalefactor) / 2.f;
+			calcSize = calcSize * *scalefactor;
+		}
 
 		CBox wb = {calcPos, calcSize};
 		wb.round();
