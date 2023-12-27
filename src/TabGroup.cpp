@@ -142,7 +142,7 @@ void Hy3TabBarEntry::prepareTexture(float scale, CBox& box) {
 	auto width = box.width;
 	auto height = box.height;
 
-	auto rounding = std::min((double) *s_rounding, std::min(width * 0.5, height * 0.5));
+	auto rounding = std::min((double) *s_rounding * scale, std::min(width * 0.5, height * 0.5));
 
 	if (this->texture.m_iTexID == 0
 	    // clang-format off
@@ -548,8 +548,9 @@ void Hy3TabGroup::renderTabBar() {
 	auto scaled_size = Vector2D(std::round(size.x * scale), std::round(size.y * scale));
 	wlr_box box = {scaled_pos.x, scaled_pos.y, scaled_size.x, scaled_size.y};
 
-	if (scaled_pos.x > monitor_size.x || scaled_pos.y > monitor_size.y
-	    || scaled_pos.x + scaled_size.x < 0 || scaled_pos.y + scaled_size.y < 0)
+	// monitor size is not scaled
+	if (pos.x > monitor_size.x || pos.y > monitor_size.y || scaled_pos.x + scaled_size.x < 0
+	    || scaled_pos.y + scaled_size.y < 0)
 		return;
 
 	if (!this->bar.damaged) {

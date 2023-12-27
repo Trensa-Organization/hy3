@@ -3,6 +3,7 @@
 
 #include <hyprland/src/Compositor.hpp>
 #include <hyprland/src/plugins/PluginAPI.hpp>
+#include <ranges>
 
 #include "Hy3Layout.hpp"
 #include "SelectionHook.hpp"
@@ -692,6 +693,24 @@ void Hy3Layout::alterSplitRatio(CWindow* pWindow, float delta, bool exact) {
 std::string Hy3Layout::getLayoutName() { return "hy3"; }
 
 CWindow* Hy3Layout::getNextWindowCandidate(CWindow* window) {
+	auto* workspace = g_pCompositor->getWorkspaceByID(window->m_iWorkspaceID);
+
+	if (workspace->m_bHasFullscreenWindow) {
+		return g_pCompositor->getFullscreenWindowOnWorkspace(window->m_iWorkspaceID);
+	}
+
+	// return the first floating window on the same workspace that has not asked not to be focused
+	if (window->m_bIsFloating) {
+		for (auto& w: g_pCompositor->m_vWindows | std::views::reverse) {
+			if (w->m_bIsMapped && !w->isHidden() && w->m_bIsFloating && w->m_iX11Type != 2
+			    && w->m_iWorkspaceID == window->m_iWorkspaceID && !w->m_bX11ShouldntFocus
+			    && !w->m_bNoFocus && w.get() != window)
+			{
+				return w.get();
+			}
+		}
+	}
+
 	auto* node = this->getWorkspaceFocusedNode(window->m_iWorkspaceID, true);
 	if (node == nullptr) return nullptr;
 
@@ -921,10 +940,31 @@ void Hy3Layout::shiftWindow(int workspace, ShiftDirection direction, bool once, 
 }
 
 void Hy3Layout::shiftFocus(int workspace, ShiftDirection direction, bool visible) {
+	auto* current_window = g_pCompositor->m_pLastWindow;
+
+	if (current_window != nullptr) {
+		auto* p_workspace = g_pCompositor->getWorkspaceByID(current_window->m_iWorkspaceID);
+		if (p_workspace->m_bHasFullscreenWindow) return;
+
+		if (current_window->m_bIsFloating) {
+			auto* next_window = g_pCompositor->getWindowInDirection(
+			    current_window,
+			    direction == ShiftDirection::Left   ? 'l'
+			    : direction == ShiftDirection::Up   ? 'u'
+			    : direction == ShiftDirection::Down ? 'd'
+			                                        : 'r'
+			);
+
+			if (next_window != nullptr) g_pCompositor->focusWindow(next_window);
+			return;
+		}
+	}
+
 	auto* node = this->getWorkspaceFocusedNode(workspace);
 	if (node == nullptr) return;
 
 	auto* target = this->shiftOrGetFocus(*node, direction, false, false, visible);
+
 	if (target != nullptr) {
 		target->focus();
 		while (target->parent != nullptr) target = target->parent;
@@ -1404,7 +1444,6 @@ void Hy3Layout::applyNodeDataToWindow(Hy3Node* node, bool no_animation) {
 	}
 
 	// clang-format off
-	static const auto* border_size = &HyprlandAPI::getConfigValue(PHANDLE, "general:border_size")->intValue;
 	static const auto* gaps_in = &HyprlandAPI::getConfigValue(PHANDLE, "general:gaps_in")->intValue;
 	static const auto* single_window_no_gaps = &HyprlandAPI::getConfigValue(PHANDLE, "plugin:hy3:no_gaps_when_only")->intValue;
 	// clang-format on
@@ -1424,9 +1463,6 @@ void Hy3Layout::applyNodeDataToWindow(Hy3Node* node, bool no_animation) {
 
 	window->m_vSize = node->size;
 	window->m_vPosition = node->position;
-
-	auto calcPos = window->m_vPosition + Vector2D(*border_size, *border_size);
-	auto calcSize = window->m_vSize - Vector2D(2 * *border_size, 2 * *border_size);
 
 	auto only_node = root_node->data.as_group.children.size() == 1
 	              && root_node->data.as_group.children.front()->data.type == Hy3NodeType::Window;
@@ -1454,6 +1490,9 @@ void Hy3Layout::applyNodeDataToWindow(Hy3Node* node, bool no_animation) {
 		window->m_sSpecialRenderData.border = true;
 		window->m_sSpecialRenderData.decorate = true;
 
+		auto calcPos = window->m_vPosition;
+		auto calcSize = window->m_vSize;
+
 		auto gaps_offset_topleft = Vector2D(*gaps_in, *gaps_in) + node->gap_topleft_offset;
 		auto gaps_offset_bottomright = Vector2D(*gaps_in * 2, *gaps_in * 2)
 		                             + node->gap_bottomright_offset + node->gap_topleft_offset;
@@ -1463,7 +1502,7 @@ void Hy3Layout::applyNodeDataToWindow(Hy3Node* node, bool no_animation) {
 
 		const auto reserved_area = window->getFullWindowReservedArea();
 		calcPos = calcPos + reserved_area.topLeft;
-		calcSize = calcSize - (reserved_area.topLeft - reserved_area.bottomRight);
+		calcSize = calcSize - (reserved_area.topLeft + reserved_area.bottomRight);
 
 		if (g_pCompositor->isWorkspaceSpecial(window->m_iWorkspaceID)) {
 			// adjust for special workspaces
