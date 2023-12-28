@@ -1436,7 +1436,7 @@ void Hy3Layout::applyNodeDataToWindow(Hy3Node* node, bool no_animation) {
 		    "node {:x}'s workspace has no associated monitor, cannot apply node data",
 		    (uintptr_t) node
 		);
-		errorNotif();
+		//errorNotif();
 		return;
 	}
 
