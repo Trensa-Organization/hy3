@@ -96,11 +96,8 @@ void Hy3Layout::onWindowCreatedTiling(CWindow* window, eDirection) {
 	Hy3Node* opening_into;
 	Hy3Node* opening_after = nullptr;
 
-	int specialWorkspaceID = monitor->specialWorkspaceID;
-	int workspace_id = specialWorkspaceID ? specialWorkspaceID : monitor->activeWorkspace;
-
-	if (workspace_id != -1) {
-		auto* root = this->getWorkspaceRootGroup(workspace_id);
+	if (monitor->activeWorkspace != -1) {
+		auto* root = this->getWorkspaceRootGroup(monitor->activeWorkspace);
 
 		if (root != nullptr) {
 			opening_after = root->getFocusedNode();
@@ -1433,7 +1430,7 @@ void Hy3Layout::applyNodeDataToWindow(Hy3Node* node, bool no_animation) {
 		);
 	}
 
-	if (!g_pCompositor->isWorkspaceSpecial(node->workspace_id) && monitor == nullptr) {
+	if (monitor == nullptr) {
 		hy3_log(
 		    ERR,
 		    "node {:x}'s workspace has no associated monitor, cannot apply node data",
