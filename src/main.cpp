@@ -18,7 +18,7 @@ APICALL EXPORT PLUGIN_DESCRIPTION_INFO PLUGIN_INIT(HANDLE handle) {
 	if (GIT_COMMIT_HASH != std::string(__hyprland_api_get_hash())) {
 		HyprlandAPI::addNotification(
 		    PHANDLE,
-		    "[hy3] Hy3 was compiled for a different version of hyprland; refusing to start.",
+		    "[hy3] hy3 was compiled for a different version of hyprland; refusing to load.",
 		    CColor {1.0, 0.2, 0.2, 1.0},
 		    10000
 		);
@@ -45,6 +45,7 @@ APICALL EXPORT PLUGIN_DESCRIPTION_INFO PLUGIN_INIT(HANDLE handle) {
 	CONF("tabs:from_top", int, 0);
 	CONF("tabs:rounding", int, 3);
 	CONF("tabs:render_text", int, 1);
+	CONF("tabs:text_center", int, 0);
 	CONF("tabs:text_font", str, "Sans");
 	CONF("tabs:text_height", int, 8);
 	CONF("tabs:text_padding", int, 3);
@@ -73,3 +74,4 @@ APICALL EXPORT PLUGIN_DESCRIPTION_INFO PLUGIN_INIT(HANDLE handle) {
 }
 
 APICALL EXPORT void PLUGIN_EXIT() {}
+
