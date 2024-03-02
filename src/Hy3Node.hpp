@@ -1,6 +1,7 @@
 #pragma once
 
 struct Hy3Node;
+struct Hy3GroupData;
 enum class Hy3GroupLayout;
 
 #include <list>
@@ -79,6 +80,7 @@ public:
 
 struct Hy3Node {
 	Hy3Node* parent = nullptr;
+	bool reparenting = false;
 	Hy3NodeData data;
 	Vector2D position;
 	Vector2D size;
@@ -97,6 +99,9 @@ struct Hy3Node {
 	void markFocused();
 	void raiseToTop();
 	Hy3Node* getFocusedNode(bool ignore_group_focus = false, bool stop_at_expanded = false);
+	Hy3Node* findNeighbor(ShiftDirection);
+	Hy3Node* getImmediateSibling(ShiftDirection);
+	void resize(ShiftDirection, double, bool no_animation = false);
 	bool isIndirectlyFocused();
 	Hy3Node& getExpandActor();
 

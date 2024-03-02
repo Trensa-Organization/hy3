@@ -7,6 +7,8 @@
 #include "Hy3Node.hpp"
 #include "globals.hpp"
 
+const float MIN_RATIO = 0.0f;
+
 // Hy3GroupData //
 
 Hy3GroupData::Hy3GroupData(Hy3GroupLayout layout): layout(layout) {
@@ -174,6 +176,7 @@ CWindow* Hy3Node::bringToTop() {
 		}
 
 		return nullptr;
+	default: return nullptr;
 	}
 }
 
@@ -237,6 +240,7 @@ Hy3Node* Hy3Node::getFocusedNode(bool ignore_group_focus, bool stop_at_expanded)
 			    stop_at_expanded
 			);
 		}
+	default: return nullptr;
 	}
 }
 
@@ -266,11 +270,23 @@ Hy3Node& Hy3Node::getExpandActor() {
 
 void Hy3Node::recalcSizePosRecursive(bool no_animation) {
 	// clang-format off
-	static const auto* gaps_in = &HyprlandAPI::getConfigValue(PHANDLE, "general:gaps_in")->intValue;
-	static const auto* gaps_out = &HyprlandAPI::getConfigValue(PHANDLE, "general:gaps_out")->intValue;
-	static const auto* group_inset = &HyprlandAPI::getConfigValue(PHANDLE, "plugin:hy3:group_inset")->intValue;
-	static const auto* tab_bar_height = &HyprlandAPI::getConfigValue(PHANDLE, "plugin:hy3:tabs:height")->intValue;
-	static const auto* tab_bar_padding = &HyprlandAPI::getConfigValue(PHANDLE, "plugin:hy3:tabs:padding")->intValue;
+	static const auto gaps_in = ConfigValue<Hyprlang::CUSTOMTYPE, CCssGapData>("general:gaps_in");
+	static const auto gaps_out = ConfigValue<Hyprlang::CUSTOMTYPE, CCssGapData>("general:gaps_out");
+	static const auto group_inset = ConfigValue<Hyprlang::INT>("plugin:hy3:group_inset");
+	static const auto tab_bar_height = ConfigValue<Hyprlang::INT>("plugin:hy3:tabs:height");
+	static const auto tab_bar_padding = ConfigValue<Hyprlang::INT>("plugin:hy3:tabs:padding");
+	// clang-format on
+
+	// clang-format off
+	auto gap_topleft_offset = Vector2D(
+	    -(gaps_in->left - gaps_out->left),
+	    -(gaps_in->top - gaps_out->top)
+	);
+
+	auto gap_bottomright_offset = Vector2D(
+	    -(gaps_in->right - gaps_out->right),
+	    -(gaps_in->bottom - gaps_out->bottom)
+	);
 	// clang-format on
 
 	if (this->data.type == Hy3NodeType::Window && this->data.as_window->m_bIsFullscreen) {
@@ -282,11 +298,6 @@ void Hy3Node::recalcSizePosRecursive(bool no_animation) {
 			this->data.as_window->m_vRealSize = monitor->vecSize;
 			return;
 		}
-
-		int outer_gaps = -(*gaps_in - *gaps_out);
-
-		auto gap_topleft_offset = Vector2D(outer_gaps, outer_gaps);
-		auto gap_bottomright_offset = Vector2D(outer_gaps, outer_gaps);
 
 		Hy3Node fake_node = {
 		    .data = this->data.as_window,
@@ -301,15 +312,7 @@ void Hy3Node::recalcSizePosRecursive(bool no_animation) {
 		return;
 	}
 
-	int outer_gaps = 0;
-	Vector2D gap_topleft_offset;
-	Vector2D gap_bottomright_offset;
-	if (this->parent == nullptr) {
-		outer_gaps = -(*gaps_in - *gaps_out);
-
-		gap_topleft_offset = Vector2D(outer_gaps, outer_gaps);
-		gap_bottomright_offset = Vector2D(outer_gaps, outer_gaps);
-	} else {
+	if (this->parent != nullptr) {
 		gap_topleft_offset = this->gap_topleft_offset;
 		gap_bottomright_offset = this->gap_bottomright_offset;
 	}
@@ -584,6 +587,7 @@ bool Hy3Node::isUrgent() {
 		}
 
 		return false;
+	default: return false;
 	}
 }
 
@@ -759,6 +763,7 @@ Hy3Node* Hy3Node::removeFromParentRecursive(Hy3Node** expand_actor) {
 		}
 	}
 
+	this->parent = nullptr;
 	return parent;
 }
 
@@ -802,6 +807,129 @@ bool Hy3Node::swallowGroups(Hy3Node* into) {
 	into->layout->nodes.remove(*child);
 
 	return true;
+}
+
+Hy3Node* getOuterChild(Hy3GroupData& group, ShiftDirection direction) {
+	switch (direction) {
+	case ShiftDirection::Left:
+	case ShiftDirection::Up: return group.children.front(); break;
+	case ShiftDirection::Right:
+	case ShiftDirection::Down: return group.children.back(); break;
+	default: return nullptr;
+	}
+}
+
+Hy3Node* Hy3Node::getImmediateSibling(ShiftDirection direction) {
+	const auto& group = this->parent->data.as_group;
+
+	auto iter = std::find(group.children.begin(), group.children.end(), this);
+
+	std::__cxx11::list<Hy3Node*>::const_iterator list_sibling;
+
+	switch (direction) {
+	case ShiftDirection::Left:
+	case ShiftDirection::Up: list_sibling = std::prev(iter); break;
+	case ShiftDirection::Right:
+	case ShiftDirection::Down: list_sibling = std::next(iter); break;
+	default: list_sibling = iter;
+	}
+
+	if (list_sibling == group.children.end()) {
+		hy3_log(WARN, "getImmediateSibling: sibling not found");
+		list_sibling = iter;
+	}
+
+	return *list_sibling;
+}
+
+Axis getAxis(Hy3GroupLayout layout) {
+	switch (layout) {
+	case Hy3GroupLayout::SplitH: return Axis::Horizontal;
+	case Hy3GroupLayout::SplitV: return Axis::Vertical;
+	default: return Axis::None;
+	}
+}
+
+Axis getAxis(ShiftDirection direction) {
+	switch (direction) {
+	case ShiftDirection::Left:
+	case ShiftDirection::Right: return Axis::Horizontal;
+	case ShiftDirection::Down:
+	case ShiftDirection::Up: return Axis::Vertical;
+	default: return Axis::None;
+	}
+}
+
+Hy3Node* Hy3Node::findNeighbor(ShiftDirection direction) {
+	auto current_node = this;
+	Hy3Node* sibling = nullptr;
+
+	while (sibling == nullptr && current_node->parent != nullptr) {
+		auto& parent_group = current_node->parent->data.as_group;
+
+		if (parent_group.layout != Hy3GroupLayout::Tabbed
+		    && getAxis(parent_group.layout) == getAxis(direction))
+		{
+			// If the current node is the outermost child of its parent group then proceed
+			// then we need to look at the parent - otherwise, the sibling is simply the immediate
+			// sibling in the child collection
+			if (getOuterChild(parent_group, direction) != current_node) {
+				sibling = current_node->getImmediateSibling(direction);
+			}
+		}
+
+		current_node = current_node->parent;
+	}
+
+	return sibling;
+}
+
+int directionToIteratorIncrement(ShiftDirection direction) {
+	switch (direction) {
+	case ShiftDirection::Left:
+	case ShiftDirection::Up: return -1;
+	case ShiftDirection::Right:
+	case ShiftDirection::Down: return 1;
+	default: hy3_log(WARN, "Unknown ShiftDirection enum value: {}", (int) direction); return 1;
+	}
+}
+
+void Hy3Node::resize(ShiftDirection direction, double delta, bool no_animation) {
+	auto& parent_node = this->parent;
+	auto& containing_group = parent_node->data.as_group;
+
+	if (containing_group.layout != Hy3GroupLayout::Tabbed
+	    && getAxis(direction) == getAxis(containing_group.layout))
+	{
+		double parent_size =
+		    getAxis(direction) == Axis::Horizontal ? parent_node->size.x : parent_node->size.y;
+		auto ratio_mod = delta * (float) containing_group.children.size() / parent_size;
+
+		const auto end_of_children = containing_group.children.end();
+		auto iter = std::find(containing_group.children.begin(), end_of_children, this);
+
+		if (iter != end_of_children) {
+			const auto outermost_node_in_group = getOuterChild(containing_group, direction);
+			if (this != outermost_node_in_group) {
+				auto inc = directionToIteratorIncrement(direction);
+				iter = std::next(iter, inc);
+				ratio_mod *= inc;
+			}
+
+			if (iter != end_of_children) {
+				auto* neighbor = *iter;
+				auto requested_size_ratio = this->size_ratio + ratio_mod;
+				auto requested_neighbor_size_ratio = neighbor->size_ratio - ratio_mod;
+
+				if (requested_size_ratio >= MIN_RATIO && requested_neighbor_size_ratio >= MIN_RATIO) {
+					this->size_ratio = requested_size_ratio;
+					neighbor->size_ratio = requested_neighbor_size_ratio;
+
+					parent_node->recalcSizePosRecursive(no_animation);
+				}
+			}
+		}
+	}
 }
 
 void Hy3Node::swapData(Hy3Node& a, Hy3Node& b) {
