@@ -7,6 +7,8 @@ i3 / sway like layout for [hyprland](https://github.com/hyprwm/hyprland).
 
 [Installation](#installation), [Configuration](#configuration)
 
+*Check the [changelog](./CHANGELOG.md) for a list of new features and improvements*
+
 ### Features
 - [x] i3 like tiling
 - [x] Node based window manipulation (you can interact with multiple windows at once)
@@ -27,7 +29,7 @@ Commits are tested before pushing and will build against the hyprland release **
 There may be a mismatch with hyprland's main branch. If hy3 fails to build against hyprland's main branch
 please make an issue or ping me in the [hy3 matrix room](https://matrix.to/#/#hy3-support:outfoxxed.me).
 
-Tagged hy3 versions are always checked against the corrosponding hyprland tag.
+Tagged hy3 versions are always checked against the corresponding hyprland tag.
 
 If you encounter any bugs, please report them in the issue tracker.
 
@@ -120,7 +122,7 @@ isn't capable of locking hy3 builds to the correct hyprland version.
 > exec-once = hyprpm reload -n
 > ```
 >
-> in your hyprland.conf. (See [the wiki](https://wiki.hyprland.org/Plugins/Using-Plugins/) for details.) 
+> in your hyprland.conf. (See [the wiki](https://wiki.hyprland.org/Plugins/Using-Plugins/) for details.)
 
 To install hy3 via hyprpm run
 
@@ -295,7 +297,7 @@ plugin {
       # 0 = always automatically split horizontally
       # <number> = pixel height to split at
       trigger_height = <int> # default: 0
-     
+
       # a space or comma separated list of workspace ids where autotile should be enabled
       # it's possible to create an exception rule by prefixing the definition with "not:"
       # workspaces = 1,2 # autotiling will only be enabled on workspaces 1 and 2
@@ -320,6 +322,8 @@ plugin {
  - `hy3:movewindow, <l | u | d | r | left | down | up | right>, [once], [visible]` - move a window left, up, down, or right
    - `once` - only move directly to the neighboring group, without moving into any of its subgroups
    - `visible` - only move between visible nodes, not hidden tabs
+ - `hy3:movetoworkspace, <workspace>, [follow]` - move the active node to the given workspace
+   - `follow` - change focus to the given workspace when moving the selected node
  - `hy3:killactive` - close all windows in the focused node
  - `hy3:changefocus, <top | bottom | raise | lower | tab | tabnode>`
    - `top` - focus all nodes in the workspace
