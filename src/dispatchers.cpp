@@ -8,6 +8,7 @@
 
 int workspace_for_action(bool allow_fullscreen = false) {
 	if (g_pLayoutManager->getCurrentLayout() != g_Hy3Layout.get()) return -1;
+	if (!g_pCompositor->m_pLastMonitor) return -1;
 
 	int workspace_id = g_pCompositor->m_pLastMonitor->activeWorkspace;
 
@@ -83,6 +84,14 @@ std::optional<ShiftDirection> parseShiftArg(std::string arg) {
 	else return {};
 }
 
+std::optional<BitFlag<Layer>> parseLayerArg(std::string arg) {
+	if (arg == "same" || arg == "samelayer") return Layer::None;
+	else if (arg == "tiled") return Layer::Tiled;
+	else if (arg == "floating") return Layer::Floating;
+	else if (arg == "all" || arg == "any") return Layer::Tiled | Layer::Floating;
+	else return {};
+}
+
 void dispatch_movewindow(std::string value) {
 	int workspace = workspace_for_action();
 	if (workspace == -1) return;
@@ -113,9 +122,24 @@ void dispatch_movefocus(std::string value) {
 	if (workspace == -1) return;
 
 	auto args = CVarList(value);
+	std::optional<BitFlag<Layer>> layerArg;
 
 	if (auto shift = parseShiftArg(args[0])) {
-		g_Hy3Layout->shiftFocus(workspace, shift.value(), args[1] == "visible");
+		bool visible;
+		BitFlag<Layer> layers;
+
+		for (auto arg: args) {
+			if (arg == "visible") visible = true;
+			else if ((layerArg = parseLayerArg(arg))) layers |= layerArg.value();
+		}
+
+		if (!layerArg) {
+			const static auto default_movefocus_layer =
+			    ConfigValue<Hyprlang::STRING>("plugin:hy3:default_movefocus_layer");
+			if ((layerArg = parseLayerArg(*default_movefocus_layer))) layers |= layerArg.value();
+		}
+
+		g_Hy3Layout->shiftFocus(workspace, shift.value(), visible, layers);
 	}
 }
 
@@ -238,14 +262,26 @@ void dispatch_debug(std::string arg) {
 	if (workspace == -1) return;
 
 	auto* root = g_Hy3Layout->getWorkspaceRootGroup(workspace);
-	if (workspace == -1) {
+	if (root == nullptr) {
 		hy3_log(LOG, "DEBUG NODES: no nodes on workspace");
 	} else {
 		hy3_log(LOG, "DEBUG NODES\n{}", root->debugNode().c_str());
 	}
 }
 
+void dispatch_resizenode(std::string value) {
+	int workspace = workspace_for_action();
+	if (workspace == -1) return;
+
+	auto* node = g_Hy3Layout->getWorkspaceFocusedNode(workspace, false, true);
+	const auto delta = g_pCompositor->parseWindowVectorArgsRelative(value, Vector2D(0, 0));
+
+	hy3_log(LOG, "resizeNode: node: {:x}, delta: {:X}", (uintptr_t) node, delta);
+	g_Hy3Layout->resizeNode(delta, CORNER_NONE, node);
+}
+
 void registerDispatchers() {
+	HyprlandAPI::addDispatcher(PHANDLE, "hy3:resizenode", dispatch_resizenode);
 	HyprlandAPI::addDispatcher(PHANDLE, "hy3:makegroup", dispatch_makegroup);
 	HyprlandAPI::addDispatcher(PHANDLE, "hy3:changegroup", dispatch_changegroup);
 	HyprlandAPI::addDispatcher(PHANDLE, "hy3:setephemeral", dispatch_setephemeral);

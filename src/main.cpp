@@ -39,6 +39,9 @@ APICALL EXPORT PLUGIN_DESCRIPTION_INFO PLUGIN_INIT(HANDLE handle) {
 	CONF("group_inset", INT, 10);
 	CONF("special_scale_factor", FLOAT, 0.8);
 	CONF("tab_first_window", INT, 0);
+	CONF("kbd_shift_delta", INT, 20);
+	CONF("default_movefocus_layer", STRING, "samelayer");
+	CONF("focus_obscured_windows_policy", INT, 2);
 
 	// tabs
 	CONF("tabs:height", INT, 15);
