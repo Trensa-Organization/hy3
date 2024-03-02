@@ -37,7 +37,7 @@ APICALL EXPORT PLUGIN_DESCRIPTION_INFO PLUGIN_INIT(HANDLE handle) {
 	CONF("no_gaps_when_only", INT, 0);
 	CONF("node_collapse_policy", INT, 2);
 	CONF("group_inset", INT, 10);
-	CONF("special_scale_factor", INT, 0.8);
+	CONF("special_scale_factor", FLOAT, 0.8);
 	CONF("tab_first_window", INT, 0);
 
 	// tabs
