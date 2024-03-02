@@ -10,7 +10,7 @@
     packages = hyprlandSystems (system: pkgs: let
       hyprlandPackage = hyprland.packages.${system}.hyprland;
     in rec {
-      hy3 = (pkgs.keepDebugInfo hyprlandPackage.stdenv).mkDerivation {
+      hy3 = hyprlandPackage.stdenv.mkDerivation {
         pname = "hy3";
         version = "0.1";
         src = ./.;
@@ -45,7 +45,7 @@
         name = "hy3";
 
         nativeBuildInputs = with pkgs; [
-          clang-tools_17
+          clang-tools_16
           bear
         ];
 

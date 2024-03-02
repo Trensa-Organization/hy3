@@ -73,14 +73,11 @@ void Hy3Layout::onWindowCreated(CWindow* window, eDirection direction) {
 
 void Hy3Layout::onWindowCreatedTiling(CWindow* window, eDirection) {
 	hy3_log(
-	    LOG,
-	    "onWindowCreatedTiling called with window {:x} (floating: {}, monitor: {}, workspace: {})",
+	    TRACE,
+	    "onWindowCreatedTiling called with window {:x} (floating: {})",
 	    (uintptr_t) window,
-	    window->m_bIsFloating,
-	    window->m_iMonitorID,
-	    window->m_iWorkspaceID
+	    window->m_bIsFloating
 	);
-
 	if (window->m_bIsFloating) return;
 
 	auto* existing = this->getNodeFromWindow(window);
@@ -94,104 +91,55 @@ void Hy3Layout::onWindowCreatedTiling(CWindow* window, eDirection) {
 		return;
 	}
 
-	this->nodes.push_back({
-	    .parent = nullptr,
-	    .data = window,
-	    .workspace_id = window->m_iWorkspaceID,
-	    .layout = this,
-	});
-
-	this->insertNode(this->nodes.back());
-}
-
-void Hy3Layout::insertNode(Hy3Node& node) {
-	if (node.parent != nullptr) {
-		hy3_log(
-		    ERR,
-		    "insertNode called for node {:x} which already has a parent ({:x})",
-		    (uintptr_t) &node,
-		    (uintptr_t) node.parent
-		);
-		return;
-	}
-
-	auto* workspace = g_pCompositor->getWorkspaceByID(node.workspace_id);
-
-	if (workspace == nullptr) {
-		hy3_log(
-		    ERR,
-		    "insertNode called for node {:x} with invalid workspace id {}",
-		    (uintptr_t) &node,
-		    node.workspace_id
-		);
-		return;
-	}
-
-	node.reparenting = true;
-
-	auto* monitor = g_pCompositor->getMonitorFromID(workspace->m_iMonitorID);
+	auto* monitor = g_pCompositor->getMonitorFromID(window->m_iMonitorID);
 
 	Hy3Node* opening_into;
 	Hy3Node* opening_after = nullptr;
 
-	auto* root = this->getWorkspaceRootGroup(node.workspace_id);
+	if (monitor->activeWorkspace != -1) {
+		auto* root = this->getWorkspaceRootGroup(monitor->activeWorkspace);
 
-	if (root != nullptr) {
-		opening_after = root->getFocusedNode();
+		if (root != nullptr) {
+			opening_after = root->getFocusedNode();
 
-		// opening_after->parent cannot be nullptr
-		if (opening_after == root) {
-			opening_after =
-			    opening_after->intoGroup(Hy3GroupLayout::SplitH, GroupEphemeralityOption::Standard);
-		}
-	}
-
-	if (opening_after == nullptr) {
-		if (g_pCompositor->m_pLastWindow != nullptr
-		    && g_pCompositor->m_pLastWindow->m_iWorkspaceID == node.workspace_id
-		    && !g_pCompositor->m_pLastWindow->m_bIsFloating
-		    && (node.data.type == Hy3NodeType::Window
-		        || g_pCompositor->m_pLastWindow != node.data.as_window)
-		    && g_pCompositor->m_pLastWindow->m_bIsMapped)
-		{
-			opening_after = this->getNodeFromWindow(g_pCompositor->m_pLastWindow);
-		} else {
-			auto* mouse_window = g_pCompositor->vectorToWindowUnified(
-			    g_pInputManager->getMouseCoordsInternal(),
-			    RESERVED_EXTENTS | INPUT_EXTENTS
-			);
-
-			if (mouse_window != nullptr && mouse_window->m_iWorkspaceID == node.workspace_id) {
-				opening_after = this->getNodeFromWindow(mouse_window);
+			// opening_after->parent cannot be nullptr
+			if (opening_after == root) {
+				opening_after =
+				    opening_after->intoGroup(Hy3GroupLayout::SplitH, GroupEphemeralityOption::Standard);
 			}
 		}
 	}
 
-	if (opening_after != nullptr
-	    && ((node.data.type == Hy3NodeType::Group
-	         && (opening_after == &node || node.data.as_group.hasChild(opening_after)))
-	        || opening_after->reparenting))
-	{
+	if (opening_after == nullptr) {
+		if (g_pCompositor->m_pLastWindow != nullptr && !g_pCompositor->m_pLastWindow->m_bIsFloating
+		    && g_pCompositor->m_pLastWindow != window
+		    && g_pCompositor->m_pLastWindow->m_iWorkspaceID == window->m_iWorkspaceID
+		    && g_pCompositor->m_pLastWindow->m_bIsMapped)
+		{
+			opening_after = this->getNodeFromWindow(g_pCompositor->m_pLastWindow);
+		} else {
+			opening_after = this->getNodeFromWindow(
+			    g_pCompositor->vectorToWindowTiled(g_pInputManager->getMouseCoordsInternal())
+			);
+		}
+	}
+
+	if (opening_after != nullptr && opening_after->workspace_id != window->m_iWorkspaceID) {
 		opening_after = nullptr;
 	}
 
 	if (opening_after != nullptr) {
 		opening_into = opening_after->parent;
 	} else {
-		if ((opening_into = this->getWorkspaceRootGroup(node.workspace_id)) == nullptr) {
-			static const auto tab_first_window =
-			    ConfigValue<Hyprlang::INT>("plugin:hy3:tab_first_window");
-
-			auto width =
-			    monitor->vecSize.x - monitor->vecReservedBottomRight.x - monitor->vecReservedTopLeft.x;
-			auto height =
-			    monitor->vecSize.y - monitor->vecReservedBottomRight.y - monitor->vecReservedTopLeft.y;
+		if ((opening_into = this->getWorkspaceRootGroup(window->m_iWorkspaceID)) == nullptr) {
+			static const auto* tab_first_window =
+			    &HyprlandAPI::getConfigValue(PHANDLE, "plugin:hy3:tab_first_window")->intValue;
 
 			this->nodes.push_back({
-			    .data = height > width ? Hy3GroupLayout::SplitV : Hy3GroupLayout::SplitH,
+			    .data = Hy3GroupLayout::SplitH,
 			    .position = monitor->vecPosition + monitor->vecReservedTopLeft,
 			    .size = monitor->vecSize - monitor->vecReservedTopLeft - monitor->vecReservedBottomRight,
-			    .workspace_id = node.workspace_id,
+			    .workspace_id = window->m_iWorkspaceID,
 			    .layout = this,
 			});
 
@@ -203,7 +151,7 @@ void Hy3Layout::insertNode(Hy3Node& node) {
 				    .data = Hy3GroupLayout::Tabbed,
 				    .position = parent.position,
 				    .size = parent.size,
-				    .workspace_id = node.workspace_id,
+				    .workspace_id = window->m_iWorkspaceID,
 				    .layout = this,
 				});
 
@@ -220,23 +168,23 @@ void Hy3Layout::insertNode(Hy3Node& node) {
 		return;
 	}
 
-	if (opening_into->workspace_id != node.workspace_id) {
+	if (opening_into->workspace_id != window->m_iWorkspaceID) {
 		hy3_log(
 		    WARN,
 		    "opening_into node ({:x}) is on workspace {} which does not match the new window "
 		    "(workspace {})",
 		    (uintptr_t) opening_into,
 		    opening_into->workspace_id,
-		    node.workspace_id
+		    window->m_iWorkspaceID
 		);
 	}
 
 	{
 		// clang-format off
-		static const auto at_enable = ConfigValue<Hyprlang::INT>("plugin:hy3:autotile:enable");
-		static const auto at_ephemeral = ConfigValue<Hyprlang::INT>("plugin:hy3:autotile:ephemeral_groups");
-		static const auto at_trigger_width = ConfigValue<Hyprlang::INT>("plugin:hy3:autotile:trigger_width");
-		static const auto at_trigger_height = ConfigValue<Hyprlang::INT>("plugin:hy3:autotile:trigger_height");
+		static const auto* at_enable = &HyprlandAPI::getConfigValue(PHANDLE, "plugin:hy3:autotile:enable")->intValue;
+		static const auto* at_ephemeral = &HyprlandAPI::getConfigValue(PHANDLE, "plugin:hy3:autotile:ephemeral_groups")->intValue;
+		static const auto* at_trigger_width = &HyprlandAPI::getConfigValue(PHANDLE, "plugin:hy3:autotile:trigger_width")->intValue;
+		static const auto* at_trigger_height = &HyprlandAPI::getConfigValue(PHANDLE, "plugin:hy3:autotile:trigger_height")->intValue;
 		// clang-format on
 
 		this->updateAutotileWorkspaces();
@@ -262,8 +210,14 @@ void Hy3Layout::insertNode(Hy3Node& node) {
 		}
 	}
 
-	node.parent = opening_into;
-	node.reparenting = false;
+	this->nodes.push_back({
+	    .parent = opening_into,
+	    .data = window,
+	    .workspace_id = window->m_iWorkspaceID,
+	    .layout = this,
+	});
+
+	auto& node = this->nodes.back();
 
 	if (opening_after == nullptr) {
 		opening_into->data.as_group.children.push_back(&node);
@@ -276,7 +230,8 @@ void Hy3Layout::insertNode(Hy3Node& node) {
 
 	hy3_log(
 	    LOG,
-	    "tiled node {:x} inserted after node {:x} in node {:x}",
+	    "tiled window ({:x} as node {:x}) after node {:x} in node {:x}",
+	    (uintptr_t) window,
 	    (uintptr_t) &node,
 	    (uintptr_t) opening_after,
 	    (uintptr_t) opening_into
@@ -287,8 +242,8 @@ void Hy3Layout::insertNode(Hy3Node& node) {
 }
 
 void Hy3Layout::onWindowRemovedTiling(CWindow* window) {
-	static const auto node_collapse_policy =
-	    ConfigValue<Hyprlang::INT>("plugin:hy3:node_collapse_policy");
+	static const auto* node_collapse_policy =
+	    &HyprlandAPI::getConfigValue(PHANDLE, "plugin:hy3:node_collapse_policy")->intValue;
 
 	auto* node = this->getNodeFromWindow(window);
 
@@ -397,100 +352,215 @@ void Hy3Layout::recalculateWindow(CWindow* window) {
 	node->recalcSizePosRecursive();
 }
 
-ShiftDirection reverse(ShiftDirection direction) {
-	switch (direction) {
-	case ShiftDirection::Left: return ShiftDirection::Right;
-	case ShiftDirection::Right: return ShiftDirection::Left;
-	case ShiftDirection::Up: return ShiftDirection::Down;
-	case ShiftDirection::Down: return ShiftDirection::Up;
-	default: return direction;
-	}
-}
-
 void Hy3Layout::resizeActiveWindow(const Vector2D& delta, eRectCorner corner, CWindow* pWindow) {
 	auto window = pWindow ? pWindow : g_pCompositor->m_pLastWindow;
 	if (!g_pCompositor->windowValidMapped(window)) return;
 
 	auto* node = this->getNodeFromWindow(window);
-
-	if (node != nullptr) {
+	if (node == nullptr) return;
+	if (node->parent != nullptr && node->parent->data.as_group.focused_child == node)
 		node = &node->getExpandActor();
 
-		auto monitor = g_pCompositor->getMonitorFromID(window->m_iMonitorID);
+	bool drag_x;
+	bool drag_y;
 
-		const bool display_left =
-		    STICKS(node->position.x, monitor->vecPosition.x + monitor->vecReservedTopLeft.x);
-		const bool display_right = STICKS(
-		    node->position.x + node->size.x,
-		    monitor->vecPosition.x + monitor->vecSize.x - monitor->vecReservedBottomRight.x
-		);
-		const bool display_top =
-		    STICKS(node->position.y, monitor->vecPosition.y + monitor->vecReservedTopLeft.y);
-		const bool display_bottom = STICKS(
-		    node->position.y + node->size.y,
-		    monitor->vecPosition.y + monitor->vecSize.y - monitor->vecReservedBottomRight.y
-		);
+	if (corner == CORNER_NONE) {
+		drag_x = delta.x > 0;
+		drag_y = delta.y > 0;
+	} else {
+		drag_x = corner == CORNER_TOPRIGHT || corner == CORNER_BOTTOMRIGHT;
+		drag_y = corner == CORNER_BOTTOMLEFT || corner == CORNER_BOTTOMRIGHT;
+	}
 
-		Vector2D resize_delta = delta;
-		bool node_is_root = (node->data.type == Hy3NodeType::Group && node->parent == nullptr)
-		                 || (node->data.type == Hy3NodeType::Window
-		                     && (node->parent == nullptr || node->parent->parent == nullptr));
+	const auto animate =
+	    &g_pConfigManager->getConfigValuePtr("misc:animate_manual_resizes")->intValue;
 
-		if (node_is_root) {
-			if (display_left && display_right) resize_delta.x = 0;
-			if (display_top && display_bottom) resize_delta.y = 0;
+	auto monitor = g_pCompositor->getMonitorFromID(window->m_iMonitorID);
+
+	const bool display_left =
+	    STICKS(node->position.x, monitor->vecPosition.x + monitor->vecReservedTopLeft.x);
+	const bool display_right = STICKS(
+	    node->position.x + node->size.x,
+	    monitor->vecPosition.x + monitor->vecSize.x - monitor->vecReservedBottomRight.x
+	);
+	const bool display_top =
+	    STICKS(node->position.y, monitor->vecPosition.y + monitor->vecReservedTopLeft.y);
+	const bool display_bottom = STICKS(
+	    node->position.y + node->size.y,
+	    monitor->vecPosition.y + monitor->vecSize.y - monitor->vecReservedBottomRight.y
+	);
+
+	Vector2D allowed_movement = delta;
+	if (display_left && display_right) allowed_movement.x = 0;
+	if (display_top && display_bottom) allowed_movement.y = 0;
+
+	auto* inner_node = node;
+
+	// break into parent groups when encountering a corner we're dragging in or a
+	// tab group
+	while (inner_node->parent != nullptr) {
+		auto& group = inner_node->parent->data.as_group;
+
+		switch (group.layout) {
+		case Hy3GroupLayout::Tabbed:
+			// treat tabbed layouts as if they dont exist during resizing
+			goto cont;
+		case Hy3GroupLayout::SplitH:
+			if ((drag_x && group.children.back() == inner_node)
+			    || (!drag_x && group.children.front() == inner_node))
+			{
+				goto cont;
+			}
+			break;
+		case Hy3GroupLayout::SplitV:
+			if ((drag_y && group.children.back() == inner_node)
+			    || (!drag_y && group.children.front() == inner_node))
+			{
+				goto cont;
+			}
+			break;
 		}
 
-		// Don't execute the logic unless there's something to do
-		if (resize_delta.x != 0 || resize_delta.y != 0) {
-			ShiftDirection target_edge_x;
-			ShiftDirection target_edge_y;
+		break;
+	cont:
+		inner_node = inner_node->parent;
+	}
 
-			// Determine the direction in which we're going to look for the neighbor node
-			// that will be resized
-			if (corner == CORNER_NONE) { // It's probably a keyboard event.
-				target_edge_x = display_right ? ShiftDirection::Left : ShiftDirection::Right;
-				target_edge_y = display_bottom ? ShiftDirection::Up : ShiftDirection::Down;
+	auto* inner_parent = inner_node->parent;
+	if (inner_parent == nullptr) return;
 
-				// If the anchor is not at the top/left then reverse the delta
-				if (target_edge_x == ShiftDirection::Left) resize_delta.x = -resize_delta.x;
-				if (target_edge_y == ShiftDirection::Up) resize_delta.y = -resize_delta.y;
-			} else { // It's probably a mouse event
-				// Resize against the edges corresponding to the selected corner
-				target_edge_x = corner == CORNER_TOPLEFT || corner == CORNER_BOTTOMLEFT
-				                  ? ShiftDirection::Left
-				                  : ShiftDirection::Right;
-				target_edge_y = corner == CORNER_TOPLEFT || corner == CORNER_TOPRIGHT
-				                  ? ShiftDirection::Up
-				                  : ShiftDirection::Down;
+	auto* outer_node = inner_node;
+
+	// break into parent groups when encountering a corner we're dragging in, a
+	// tab group, or a layout matching the inner_parent.
+	while (outer_node->parent != nullptr) {
+		auto& group = outer_node->parent->data.as_group;
+
+		// break out of all layouts that match the orientation of the inner_parent
+		if (group.layout == inner_parent->data.as_group.layout) goto cont2;
+
+		switch (group.layout) {
+		case Hy3GroupLayout::Tabbed:
+			// treat tabbed layouts as if they dont exist during resizing
+			goto cont2;
+		case Hy3GroupLayout::SplitH:
+			if ((drag_x && group.children.back() == outer_node)
+			    || (!drag_x && group.children.front() == outer_node))
+			{
+				goto cont2;
 			}
-
-			// Find the neighboring node in each axis, which will be either above or at the
-			// same level as the initiating node in the layout hierarchy.  These are the nodes
-			// which must get resized (rather than the initiator) because they are the
-			// highest point in the hierarchy
-			auto horizontal_neighbor = node->findNeighbor(target_edge_x);
-			auto vertical_neighbor = node->findNeighbor(target_edge_y);
-
-			static const auto animate = ConfigValue<Hyprlang::INT>("misc:animate_manual_resizes");
-
-			// Note that the resize direction is reversed, because from the neighbor's perspective
-			// the edge to be moved is the opposite way round.  However, the delta is still the same.
-			if (horizontal_neighbor) {
-				horizontal_neighbor->resize(reverse(target_edge_x), resize_delta.x, *animate == 0);
+			break;
+		case Hy3GroupLayout::SplitV:
+			if ((drag_y && group.children.back() == outer_node)
+			    || (!drag_y && group.children.front() == outer_node))
+			{
+				goto cont2;
 			}
-
-			if (vertical_neighbor) {
-				vertical_neighbor->resize(reverse(target_edge_y), resize_delta.y, *animate == 0);
-			}
+			break;
 		}
-	} else if (window->m_bIsFloating) {
-		// No parent node - is this a floating window?  If so, use the same logic as the `main` layout
-		const auto required_size = Vector2D(
-		    std::max((window->m_vRealSize.goalv() + delta).x, 20.0),
-		    std::max((window->m_vRealSize.goalv() + delta).y, 20.0)
-		);
-		window->m_vRealSize = required_size;
+
+		break;
+	cont2:
+		outer_node = outer_node->parent;
+	}
+
+	auto& inner_group = inner_parent->data.as_group;
+	// adjust the inner node
+	switch (inner_group.layout) {
+	case Hy3GroupLayout::SplitH: {
+		auto ratio_mod =
+		    allowed_movement.x * (float) inner_group.children.size() / inner_parent->size.x;
+
+		auto iter = std::find(inner_group.children.begin(), inner_group.children.end(), inner_node);
+
+		if (drag_x) {
+			if (inner_node == inner_group.children.back()) break;
+			iter = std::next(iter);
+		} else {
+			if (inner_node == inner_group.children.front()) break;
+			iter = std::prev(iter);
+			ratio_mod = -ratio_mod;
+		}
+
+		auto* neighbor = *iter;
+
+		inner_node->size_ratio += ratio_mod;
+		neighbor->size_ratio -= ratio_mod;
+	} break;
+	case Hy3GroupLayout::SplitV: {
+		auto ratio_mod = allowed_movement.y * (float) inner_parent->data.as_group.children.size()
+		               / inner_parent->size.y;
+
+		auto iter = std::find(inner_group.children.begin(), inner_group.children.end(), inner_node);
+
+		if (drag_y) {
+			if (inner_node == inner_group.children.back()) break;
+			iter = std::next(iter);
+		} else {
+			if (inner_node == inner_group.children.front()) break;
+			iter = std::prev(iter);
+			ratio_mod = -ratio_mod;
+		}
+
+		auto* neighbor = *iter;
+
+		inner_node->size_ratio += ratio_mod;
+		neighbor->size_ratio -= ratio_mod;
+	} break;
+	case Hy3GroupLayout::Tabbed: break;
+	}
+
+	inner_parent->recalcSizePosRecursive(*animate == 0);
+
+	if (outer_node != nullptr && outer_node->parent != nullptr) {
+		auto* outer_parent = outer_node->parent;
+		auto& outer_group = outer_parent->data.as_group;
+		// adjust the outer node
+		switch (outer_group.layout) {
+		case Hy3GroupLayout::SplitH: {
+			auto ratio_mod =
+			    allowed_movement.x * (float) outer_group.children.size() / outer_parent->size.x;
+
+			auto iter = std::find(outer_group.children.begin(), outer_group.children.end(), outer_node);
+
+			if (drag_x) {
+				if (outer_node == inner_group.children.back()) break;
+				iter = std::next(iter);
+			} else {
+				if (outer_node == inner_group.children.front()) break;
+				iter = std::prev(iter);
+				ratio_mod = -ratio_mod;
+			}
+
+			auto* neighbor = *iter;
+
+			outer_node->size_ratio += ratio_mod;
+			neighbor->size_ratio -= ratio_mod;
+		} break;
+		case Hy3GroupLayout::SplitV: {
+			auto ratio_mod = allowed_movement.y * (float) outer_parent->data.as_group.children.size()
+			               / outer_parent->size.y;
+
+			auto iter = std::find(outer_group.children.begin(), outer_group.children.end(), outer_node);
+
+			if (drag_y) {
+				if (outer_node == outer_group.children.back()) break;
+				iter = std::next(iter);
+			} else {
+				if (outer_node == outer_group.children.front()) break;
+				iter = std::prev(iter);
+				ratio_mod = -ratio_mod;
+			}
+
+			auto* neighbor = *iter;
+
+			outer_node->size_ratio += ratio_mod;
+			neighbor->size_ratio -= ratio_mod;
+		} break;
+		case Hy3GroupLayout::Tabbed: break;
+		}
+
+		outer_parent->recalcSizePosRecursive(*animate == 0);
 	}
 }
 
@@ -543,21 +613,13 @@ void Hy3Layout::fullscreenRequestForWindow(
 			// Copy of vaxry's massive hack
 
 			// clang-format off
-			static const auto gaps_in = ConfigValue<Hyprlang::CUSTOMTYPE, CCssGapData>("general:gaps_in");
-			static const auto gaps_out = ConfigValue<Hyprlang::CUSTOMTYPE, CCssGapData>("general:gaps_out");
+			static const auto* gaps_in = &HyprlandAPI::getConfigValue(PHANDLE, "general:gaps_in")->intValue;
+			static const auto* gaps_out = &HyprlandAPI::getConfigValue(PHANDLE, "general:gaps_out")->intValue;
 			// clang-format on
 
-			// clang-format off
-			auto gap_pos_offset = Vector2D(
-			    -(gaps_in->left - gaps_out->left),
-			    -(gaps_in->top - gaps_out->top)
-			);
-			// clang-format on
-
-			auto gap_size_offset = Vector2D(
-			    -(gaps_in->left - gaps_out->left) + -(gaps_in->right - gaps_out->right),
-			    -(gaps_in->top - gaps_out->top) + -(gaps_in->bottom - gaps_out->bottom)
-			);
+			int outer_gaps = -(*gaps_in - *gaps_out);
+			auto gap_pos_offset = Vector2D(outer_gaps, outer_gaps);
+			auto gap_size_offset = Vector2D(outer_gaps * 2, outer_gaps * 2);
 
 			Hy3Node fakeNode = {
 			    .data = window,
@@ -639,7 +701,7 @@ CWindow* Hy3Layout::getNextWindowCandidate(CWindow* window) {
 		for (auto& w: g_pCompositor->m_vWindows | std::views::reverse) {
 			if (w->m_bIsMapped && !w->isHidden() && w->m_bIsFloating && w->m_iX11Type != 2
 			    && w->m_iWorkspaceID == window->m_iWorkspaceID && !w->m_bX11ShouldntFocus
-			    && !w->m_sAdditionalConfigData.noFocus && w.get() != window)
+			    && !w->m_bNoFocus && w.get() != window)
 			{
 				return w.get();
 			}
@@ -652,7 +714,6 @@ CWindow* Hy3Layout::getNextWindowCandidate(CWindow* window) {
 	switch (node->data.type) {
 	case Hy3NodeType::Window: return node->data.as_window;
 	case Hy3NodeType::Group: return nullptr;
-	default: return nullptr;
 	}
 }
 
@@ -908,95 +969,6 @@ void Hy3Layout::shiftFocus(int workspace, ShiftDirection direction, bool visible
 	}
 }
 
-void changeNodeWorkspaceRecursive(Hy3Node& node, CWorkspace* workspace) {
-	node.workspace_id = workspace->m_iID;
-
-	if (node.data.type == Hy3NodeType::Window) {
-		auto* window = node.data.as_window;
-		window->moveToWorkspace(workspace->m_iID);
-		window->updateToplevel();
-		window->updateDynamicRules();
-	} else {
-		for (auto* child: node.data.as_group.children) {
-			changeNodeWorkspaceRecursive(*child, workspace);
-		}
-	}
-}
-
-void Hy3Layout::moveNodeToWorkspace(int origin, std::string wsname, bool follow) {
-	std::string target_name;
-	auto target = getWorkspaceIDFromString(wsname, target_name);
-
-	if (target == WORKSPACE_INVALID) {
-		hy3_log(ERR, "moveNodeToWorkspace called with invalid workspace {}", wsname);
-		return;
-	}
-
-	if (origin == target) return;
-
-	auto* node = this->getWorkspaceFocusedNode(origin);
-	auto* focused_window = g_pCompositor->m_pLastWindow;
-	auto* focused_window_node = this->getNodeFromWindow(focused_window);
-
-	auto* workspace = g_pCompositor->getWorkspaceByID(target);
-
-	auto wsid = node != nullptr           ? node->workspace_id
-	          : focused_window != nullptr ? focused_window->m_iWorkspaceID
-	                                      : WORKSPACE_INVALID;
-
-	if (wsid == WORKSPACE_INVALID) return;
-
-	auto* origin_ws = g_pCompositor->getWorkspaceByID(wsid);
-
-	if (workspace == nullptr) {
-		hy3_log(LOG, "creating target workspace {} for node move", target);
-
-		workspace = g_pCompositor->createNewWorkspace(target, origin_ws->m_iMonitorID, target_name);
-	}
-
-	// floating or fullscreen
-	if (focused_window != nullptr
-	    && (focused_window_node == nullptr || focused_window->m_bIsFullscreen))
-	{
-		hy3_log(LOG, "{:x}, {:x}", (uintptr_t) focused_window, (uintptr_t) workspace);
-		g_pCompositor->moveWindowToWorkspaceSafe(focused_window, workspace);
-	} else {
-		if (node == nullptr) return;
-
-		hy3_log(
-		    LOG,
-		    "moving node {:x} from workspace {} to workspace {} (follow: {})",
-		    (uintptr_t) node,
-		    origin,
-		    target,
-		    follow
-		);
-
-		Hy3Node* expand_actor = nullptr;
-		node->removeFromParentRecursive(&expand_actor);
-		if (expand_actor != nullptr) expand_actor->recalcSizePosRecursive();
-
-		changeNodeWorkspaceRecursive(*node, workspace);
-		this->insertNode(*node);
-	}
-
-	if (follow) {
-		auto* monitor = g_pCompositor->getMonitorFromID(workspace->m_iMonitorID);
-
-		if (workspace->m_bIsSpecialWorkspace) {
-			monitor->setSpecialWorkspace(workspace);
-		} else if (origin_ws->m_bIsSpecialWorkspace) {
-			g_pCompositor->getMonitorFromID(origin_ws->m_iMonitorID)->setSpecialWorkspace(nullptr);
-		}
-
-		monitor->changeWorkspace(workspace);
-
-		static const auto allow_workspace_cycles =
-		    ConfigValue<Hyprlang::INT>("binds:allow_workspace_cycles");
-		if (*allow_workspace_cycles) workspace->rememberPrevWorkspace(origin_ws);
-	}
-}
-
 void Hy3Layout::changeFocus(int workspace, FocusShift shift) {
 	auto* node = this->getWorkspaceFocusedNode(workspace);
 	if (node == nullptr) return;
@@ -1057,18 +1029,18 @@ bottom:
 
 Hy3Node* findTabBarAt(Hy3Node& node, Vector2D pos, Hy3Node** focused_node) {
 	// clang-format off
-	static const auto gaps_in = ConfigValue<Hyprlang::CUSTOMTYPE, CCssGapData>("general:gaps_in");
-	static const auto gaps_out = ConfigValue<Hyprlang::CUSTOMTYPE, CCssGapData>("general:gaps_out");
-	static const auto tab_bar_height = ConfigValue<Hyprlang::INT>("plugin:hy3:tabs:height");
-	static const auto tab_bar_padding = ConfigValue<Hyprlang::INT>("plugin:hy3:tabs:padding");
+	static const auto* gaps_in = &HyprlandAPI::getConfigValue(PHANDLE, "general:gaps_in")->intValue;
+	static const auto* gaps_out = &HyprlandAPI::getConfigValue(PHANDLE, "general:gaps_out")->intValue;
+	static const auto* tab_bar_height = &HyprlandAPI::getConfigValue(PHANDLE, "plugin:hy3:tabs:height")->intValue;
+	static const auto* tab_bar_padding = &HyprlandAPI::getConfigValue(PHANDLE, "plugin:hy3:tabs:padding")->intValue;
 	// clang-format on
 
 	auto inset = *tab_bar_height + *tab_bar_padding;
 
 	if (node.parent == nullptr) {
-		inset += gaps_out->left;
+		inset += *gaps_out;
 	} else {
-		inset += gaps_in->left;
+		inset += *gaps_in;
 	}
 
 	if (node.data.type == Hy3NodeType::Group) {
@@ -1128,13 +1100,8 @@ void Hy3Layout::focusTab(
 	Hy3Node* tab_focused_node;
 
 	if (target == TabFocus::MouseLocation || mouse != TabFocusMousePriority::Ignore) {
-		auto mouse_pos = g_pInputManager->getMouseCoordsInternal();
-		if (g_pCompositor->vectorToWindowUnified(
-		        mouse_pos,
-		        RESERVED_EXTENTS | INPUT_EXTENTS | ALLOW_FLOATING | FLOATING_ONLY
-		    )
-		    == nullptr)
-		{
+		if (g_pCompositor->windowFloatingFromCursor() == nullptr) {
+			auto mouse_pos = g_pInputManager->getMouseCoordsInternal();
 			tab_node = findTabBarAt(*node, mouse_pos, &tab_focused_node);
 			if (tab_node != nullptr) goto hastab;
 		}
@@ -1308,12 +1275,12 @@ fullscreen:
 	window->m_vRealPosition = monitor->vecPosition;
 	window->m_vRealSize = monitor->vecSize;
 	goto fsupdate;
-// unfullscreen:
-// 	if (node->data.type != Hy3NodeType::Window) return;
-// 	window = node->data.as_window;
-// 	window->m_bIsFullscreen = false;
-// 	workspace->m_bHasFullscreenWindow = false;
-// 	goto fsupdate;
+unfullscreen:
+	if (node->data.type != Hy3NodeType::Window) return;
+	window = node->data.as_window;
+	window->m_bIsFullscreen = false;
+	workspace->m_bHasFullscreenWindow = false;
+	goto fsupdate;
 fsupdate:
 	g_pCompositor->updateWindowAnimatedDecorationValues(window);
 	g_pXWaylandManager->setWindowSize(window, window->m_vRealSize.goalv());
@@ -1333,19 +1300,17 @@ bool Hy3Layout::shouldRenderSelected(CWindow* window) {
 
 	switch (focused->data.type) {
 	case Hy3NodeType::Window: return focused->data.as_window == window;
-	case Hy3NodeType::Group: {
+	case Hy3NodeType::Group:
 		auto* node = this->getNodeFromWindow(window);
 		if (node == nullptr) return false;
 		return focused->data.as_group.hasChild(node);
-	}
-	default: return false;
 	}
 }
 
 Hy3Node* Hy3Layout::getWorkspaceRootGroup(const int& workspace) {
 	for (auto& node: this->nodes) {
 		if (node.workspace_id == workspace && node.parent == nullptr
-		    && node.data.type == Hy3NodeType::Group && !node.reparenting)
+		    && node.data.type == Hy3NodeType::Group)
 		{
 			return &node;
 		}
@@ -1476,8 +1441,8 @@ void Hy3Layout::applyNodeDataToWindow(Hy3Node* node, bool no_animation) {
 	}
 
 	// clang-format off
-	static const auto gaps_in = ConfigValue<Hyprlang::CUSTOMTYPE, CCssGapData>("general:gaps_in");
-	static const auto single_window_no_gaps = ConfigValue<Hyprlang::INT>("plugin:hy3:no_gaps_when_only");
+	static const auto* gaps_in = &HyprlandAPI::getConfigValue(PHANDLE, "general:gaps_in")->intValue;
+	static const auto* single_window_no_gaps = &HyprlandAPI::getConfigValue(PHANDLE, "plugin:hy3:no_gaps_when_only")->intValue;
 	// clang-format on
 
 	if (!g_pCompositor->windowExists(window) || !window->m_bIsMapped) {
@@ -1525,10 +1490,9 @@ void Hy3Layout::applyNodeDataToWindow(Hy3Node* node, bool no_animation) {
 		auto calcPos = window->m_vPosition;
 		auto calcSize = window->m_vSize;
 
-		auto gaps_offset_topleft = Vector2D(gaps_in->left, gaps_in->top) + node->gap_topleft_offset;
-		auto gaps_offset_bottomright =
-		    Vector2D(gaps_in->left + gaps_in->right, gaps_in->top + gaps_in->bottom)
-		    + node->gap_bottomright_offset + node->gap_topleft_offset;
+		auto gaps_offset_topleft = Vector2D(*gaps_in, *gaps_in) + node->gap_topleft_offset;
+		auto gaps_offset_bottomright = Vector2D(*gaps_in * 2, *gaps_in * 2)
+		                             + node->gap_bottomright_offset + node->gap_topleft_offset;
 
 		calcPos = calcPos + gaps_offset_topleft;
 		calcSize = calcSize - gaps_offset_bottomright;
@@ -1806,8 +1770,8 @@ Hy3Node* Hy3Layout::shiftOrGetFocus(
 }
 
 void Hy3Layout::updateAutotileWorkspaces() {
-	static const auto autotile_raw_workspaces =
-	    ConfigValue<Hyprlang::STRING>("plugin:hy3:autotile:workspaces");
+	static const auto* autotile_raw_workspaces =
+	    &HyprlandAPI::getConfigValue(PHANDLE, "plugin:hy3:autotile:workspaces")->strValue;
 
 	if (*autotile_raw_workspaces == this->autotile.raw_workspaces) {
 		return;
