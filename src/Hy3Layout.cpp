@@ -3,6 +3,7 @@
 
 #include <hyprland/src/Compositor.hpp>
 #include <hyprland/src/plugins/PluginAPI.hpp>
+#include <hyprlang.hpp>
 #include <ranges>
 
 #include "Hy3Layout.hpp"
@@ -1539,8 +1540,7 @@ void Hy3Layout::applyNodeDataToWindow(Hy3Node* node, bool no_animation) {
 
 		if (g_pCompositor->isWorkspaceSpecial(window->m_iWorkspaceID)) {
 			// adjust for special workspaces
-			static const auto* scalefactor
-			    = &HyprlandAPI::getConfigValue(PHANDLE, "plugin:hy3:special_scale_factor")->floatValue;
+			static const auto scalefactor = ConfigValue<Hyprlang::INT>("plugin:hy3:special_scale_factor");  
 			calcPos = calcPos + (calcSize - calcSize * *scalefactor) / 2.f;
 			calcSize = calcSize * *scalefactor;
 		}
