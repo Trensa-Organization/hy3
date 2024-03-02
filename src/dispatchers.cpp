@@ -6,7 +6,7 @@
 #include "dispatchers.hpp"
 #include "globals.hpp"
 
-int workspace_for_action() {
+int workspace_for_action(bool allow_fullscreen = false) {
 	if (g_pLayoutManager->getCurrentLayout() != g_Hy3Layout.get()) return -1;
 
 	int workspace_id = g_pCompositor->m_pLastMonitor->activeWorkspace;
@@ -14,7 +14,7 @@ int workspace_for_action() {
 	if (workspace_id == -1) return -1;
 	auto* workspace = g_pCompositor->getWorkspaceByID(workspace_id);
 	if (workspace == nullptr) return -1;
-	if (workspace->m_bHasFullscreenWindow) return -1;
+	if (!allow_fullscreen && workspace->m_bHasFullscreenWindow) return -1;
 
 	return workspace_id;
 }
@@ -119,6 +119,20 @@ void dispatch_movefocus(std::string value) {
 	}
 }
 
+void dispatch_move_to_workspace(std::string value) {
+	int origin_workspace = workspace_for_action(true);
+	if (origin_workspace == -1) return;
+
+	auto args = CVarList(value);
+
+	auto workspace = args[0];
+	if (workspace == "") return;
+
+	bool follow = args[1] == "follow";
+
+	g_Hy3Layout->moveNodeToWorkspace(origin_workspace, workspace, follow);
+}
+
 void dispatch_changefocus(std::string arg) {
 	int workspace = workspace_for_action();
 	if (workspace == -1) return;
@@ -188,7 +202,7 @@ void dispatch_setswallow(std::string arg) {
 }
 
 void dispatch_killactive(std::string value) {
-	int workspace = workspace_for_action();
+	int workspace = workspace_for_action(true);
 	if (workspace == -1) return;
 
 	g_Hy3Layout->killFocusedNode(workspace);
@@ -237,6 +251,7 @@ void registerDispatchers() {
 	HyprlandAPI::addDispatcher(PHANDLE, "hy3:setephemeral", dispatch_setephemeral);
 	HyprlandAPI::addDispatcher(PHANDLE, "hy3:movefocus", dispatch_movefocus);
 	HyprlandAPI::addDispatcher(PHANDLE, "hy3:movewindow", dispatch_movewindow);
+	HyprlandAPI::addDispatcher(PHANDLE, "hy3:movetoworkspace", dispatch_move_to_workspace);
 	HyprlandAPI::addDispatcher(PHANDLE, "hy3:changefocus", dispatch_changefocus);
 	HyprlandAPI::addDispatcher(PHANDLE, "hy3:focustab", dispatch_focustab);
 	HyprlandAPI::addDispatcher(PHANDLE, "hy3:setswallow", dispatch_setswallow);

@@ -7,6 +7,8 @@ i3 / sway like layout for [hyprland](https://github.com/hyprwm/hyprland).
 
 [Installation](#installation), [Configuration](#configuration)
 
+*Check the [changelog](./CHANGELOG.md) for a list of new features and improvements*
+
 ### Features
 - [x] i3 like tiling
 - [x] Node based window manipulation (you can interact with multiple windows at once)
@@ -27,7 +29,7 @@ Commits are tested before pushing and will build against the hyprland release **
 There may be a mismatch with hyprland's main branch. If hy3 fails to build against hyprland's main branch
 please make an issue or ping me in the [hy3 matrix room](https://matrix.to/#/#hy3-support:outfoxxed.me).
 
-Tagged hy3 versions are always checked against the corrosponding hyprland tag.
+Tagged hy3 versions are always checked against the corresponding hyprland tag.
 
 If you encounter any bugs, please report them in the issue tracker.
 
@@ -113,14 +115,14 @@ wayland.windowManager.hyprland = {
 Hyprland now has a dedicated plugin manager, which should be used when your package manager
 isn't capable of locking hy3 builds to the correct hyprland version.
 
-> [!IMPORTANT]
-> Make sure hyprpm is activated by putting
->
-> ```conf
-> exec-once = hyprpm reload -n
-> ```
->
-> in your hyprland.conf. (See [the wiki](https://wiki.hyprland.org/Plugins/Using-Plugins/) for details.) 
+[!IMPORTANT]
+Make sure hyprpm is activated by putting
+
+```conf
+exec-once = hyprpm reload -n
+```
+
+in your hyprland.conf. (See [the wiki](https://wiki.hyprland.org/Plugins/Using-Plugins/) for details.) 
 
 To install hy3 via hyprpm run
 
@@ -136,14 +138,14 @@ hyprpm update
 
 (See [the wiki](https://wiki.hyprland.org/Plugins/Using-Plugins/) for details.)
 
-> [!WARNING]
-> When you are running a tagged hyprland version hyprpm (0.34.0+) will build against hy3's
-> corrosponding release. However if you are running an untagged build (aka `-git`) hyprpm
-> will build against hy3's *latest* commit. This means **if you are running an out of date
-> untagged build of hyprland, hyprpm may pick an incompatible revision of hy3**.
->
-> To fix this problem you will either need to update hyprland or manually build the correct
-> version of hy3.
+[!WARNING]
+When you are running a tagged hyprland version hyprpm (0.34.0+) will build against hy3's
+corrosponding release. However if you are running an untagged build (aka `-git`) hyprpm
+will build against hy3's *latest* commit. This means **if you are running an out of date
+untagged build of hyprland, hyprpm may pick an incompatible revision of hy3**.
+
+To fix this problem you will either need to update hyprland or manually build the correct
+version of hy3.
 
 ### Manual
 Install hyprland, including its headers and pkg-config file, then run the following commands:
@@ -160,19 +162,19 @@ Note that the hyprland headers and pkg-config file **MUST be installed correctly
 
 ### Arch (AUR)
 
-> [!NOTE]
-> This method of installation is deprecated and you should use *hyprpm* instead,
-> as it is simpler and less error prone.
+[!NOTE]
+This method of installation is deprecated and you should use *hyprpm* instead,
+as it is simpler and less error prone.
 
-> [!CAUTION]
-> Pacman is not very reliable when it comes to building packages in the correct order.
-> If you get a notification saying *hy3 was compiled for a different version of hyprland*
-> then your packages likely updated in the wrong order, or you have hyprland headers in `/usr/local`.
->
-> To fix this, remove `/usr/include/hyprland`, `/usr/local/include/hyprland`, `/usr/share/pkgconfig/hyprland.pc` and `/usr/local/share/pkgconfig/hyprland.pc`,
-> then reinstall hyprland and hy3.
->
-> If you know how to fix this please open an issue or pr, or message `@outfoxxed:outfoxxed.me` in the [matrix room](https://matrix.to/#/#hy3-support:outfoxxed.me).
+[!CAUTION]
+Pacman is not very reliable when it comes to building packages in the correct order.
+If you get a notification saying *hy3 was compiled for a different version of hyprland*
+then your packages likely updated in the wrong order, or you have hyprland headers in `/usr/local`.
+
+To fix this, remove `/usr/include/hyprland`, `/usr/local/include/hyprland`, `/usr/share/pkgconfig/hyprland.pc` and `/usr/local/share/pkgconfig/hyprland.pc`,
+then reinstall hyprland and hy3.
+
+If you know how to fix this please open an issue or pr, or message `@outfoxxed:outfoxxed.me` in the [matrix room](https://matrix.to/#/#hy3-support:outfoxxed.me).
 
 hy3 stable (for arch's `hyprland` package) is availible on the AUR as [hy3](https://aur.archlinux.org/packages/hy3).
 
@@ -187,10 +189,10 @@ plugin = /usr/lib/libhy3.so
 
 ## Configuration
 
-> [!IMPORTANT]
-> The configuration listed below is for the current hy3 commit.
-> If you are using a release version of hy3 then make sure you are
-> reading the tagged revision of this readme.
+[!IMPORTANT]
+The configuration listed below is for the current hy3 commit.
+If you are using a release version of hy3 then make sure you are
+reading the tagged revision of this readme.
 
 Set your `general:layout` to `hy3` in hyprland.conf.
 
@@ -295,7 +297,7 @@ plugin {
       # 0 = always automatically split horizontally
       # <number> = pixel height to split at
       trigger_height = <int> # default: 0
-     
+
       # a space or comma separated list of workspace ids where autotile should be enabled
       # it's possible to create an exception rule by prefixing the definition with "not:"
       # workspaces = 1,2 # autotiling will only be enabled on workspaces 1 and 2
@@ -320,6 +322,8 @@ plugin {
  - `hy3:movewindow, <l | u | d | r | left | down | up | right>, [once], [visible]` - move a window left, up, down, or right
    - `once` - only move directly to the neighboring group, without moving into any of its subgroups
    - `visible` - only move between visible nodes, not hidden tabs
+ - `hy3:movetoworkspace, <workspace>, [follow]` - move the active node to the given workspace
+   - `follow` - change focus to the given workspace when moving the selected node
  - `hy3:killactive` - close all windows in the focused node
  - `hy3:changefocus, <top | bottom | raise | lower | tab | tabnode>`
    - `top` - focus all nodes in the workspace
