@@ -10,12 +10,22 @@
         "xdph": "xdph"
       },
       "locked": {
+<<<<<<< HEAD
         "lastModified": 1709720053,
         "narHash": "sha256-hR0RSeqFOXCggqbGhkFZT3ZAbGc2cAoeeyXU3V5J4hU=",
         "owner": "hyprwm",
         "repo": "Hyprland",
         "rev": "d6f1b151b2fe85ffbb131cbdd05acefc6a357e81",
         "type": "github"
+=======
+        "lastModified": 1709080360,
+        "narHash": "sha256-oZe4k6jtO/0govmERGcbeyvE9EfTvXY5bnyIs6AsL9U=",
+        "ref": "v0.36.0",
+        "rev": "1c460e98f870676b15871fe4e5bfeb1a32a3d6d8",
+        "revCount": 4102,
+        "type": "git",
+        "url": "file:///home/admin/programming/outfoxxed/hyprland/Hyprland"
+>>>>>>> parent of a392bfd (Fix breakage after hyprland#4911)
       },
       "original": {
         "owner": "hyprwm",
