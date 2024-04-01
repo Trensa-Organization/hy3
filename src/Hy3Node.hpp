@@ -10,7 +10,6 @@ enum class Hy3GroupLayout;
 
 #include "Hy3Layout.hpp"
 #include "TabGroup.hpp"
-#include "conversions.hpp"
 
 enum class Hy3GroupLayout {
 	SplitH,
@@ -43,6 +42,7 @@ struct Hy3GroupData {
 	Hy3GroupData(Hy3GroupLayout layout);
 	~Hy3GroupData();
 
+	bool hasChild(Hy3Node* child);
 	void collapseExpansions();
 	void setLayout(Hy3GroupLayout layout);
 	void setEphemeral(GroupEphemeralityOption ephemeral);
@@ -98,11 +98,9 @@ struct Hy3Node {
 	CWindow* bringToTop();
 	void markFocused();
 	void raiseToTop();
-	Vector2D middle();
 	Hy3Node* getFocusedNode(bool ignore_group_focus = false, bool stop_at_expanded = false);
 	Hy3Node* findNeighbor(ShiftDirection);
 	Hy3Node* getImmediateSibling(ShiftDirection);
-	Hy3Node* getRoot();
 	void resize(ShiftDirection, double, bool no_animation = false);
 	bool isIndirectlyFocused();
 	Hy3Node& getExpandActor();
@@ -118,7 +116,6 @@ struct Hy3Node {
 
 	Hy3Node* findNodeForTabGroup(Hy3TabGroup&);
 	void appendAllWindows(std::vector<CWindow*>&);
-	bool hasChild(Hy3Node* child);
 	std::string debugNode();
 
 	// Remove this node from its parent, deleting the parent if it was
@@ -133,40 +130,4 @@ struct Hy3Node {
 	// Attempt to swallow a group. returns true if swallowed
 	static bool swallowGroups(Hy3Node* into);
 	static void swapData(Hy3Node&, Hy3Node&);
-};
-
-struct Distance {
-	double primary_axis;
-	double secondary_axis;
-
-	Distance() = default;
-
-	Distance(ShiftDirection direction, Vector2D from, Vector2D to) {
-		auto dist = from - to;
-		primary_axis = getAxis(direction) == Axis::Horizontal ? dist.x : dist.y;
-		secondary_axis = getAxis(direction) == Axis::Horizontal ? dist.y : dist.x;
-	}
-
-	bool operator<(Distance other) {
-		return signbit(primary_axis) == signbit(other.primary_axis)
-		    && (abs(primary_axis) < abs(other.primary_axis)
-		        || (primary_axis == other.primary_axis
-		            && abs(secondary_axis) < abs(other.secondary_axis)));
-	}
-
-	bool operator>(Distance other) {
-		return signbit(primary_axis) == signbit(other.primary_axis)
-		    && (abs(primary_axis) > abs(other.primary_axis)
-		        || (primary_axis == other.primary_axis
-		            && abs(secondary_axis) > abs(other.secondary_axis)));
-	}
-
-	bool isSameDirection(Distance other) {
-		return signbit(primary_axis) == signbit(other.primary_axis);
-	}
-
-	bool isInDirection(ShiftDirection direction) {
-		return std::signbit(primary_axis)
-		    == (getSearchDirection(direction) == SearchDirection::Forwards);
-	}
 };
