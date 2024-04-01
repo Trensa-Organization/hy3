@@ -1,7 +1,4 @@
-<img align="right" style="width: 256px" src="assets/logo.svg">
-
 # hy3
-<a href="https://matrix.to/#/#hy3:outfoxxed.me"><img src="https://img.shields.io/badge/Join%20the%20matrix%20room-%23hy3:outfoxxed.me-0dbd8b?logo=matrix&style=flat-square"></a>
 
 i3 / sway like layout for [hyprland](https://github.com/hyprwm/hyprland).
 
@@ -20,27 +17,6 @@ Additional features may be suggested in the repo issues or the [matrix room](htt
 ### Demo
 <video width="640" height="360" controls="controls" src="https://user-images.githubusercontent.com/83010835/255322916-85ae8196-8b12-4e15-b060-9872db10839f.mp4"></video>
 
-### Stability
-hy3 has a tagged release for each hyprland update, and master tracks hyprland's main branch.
-If you are running a release version of hyprland then use the matching tagged hy3 version.
-If you are running an untagged hyprland release then use the `master` branch of hy3.
-
-Commits are tested before pushing and will build against the hyprland release **in the flake.lock file**.
-There may be a mismatch with hyprland's main branch. If hy3 fails to build against hyprland's main branch
-please make an issue or ping me in the [hy3 matrix room](https://matrix.to/#/#hy3-support:outfoxxed.me).
-
-Tagged hy3 versions are always checked against the corresponding hyprland tag.
-
-If you encounter any bugs, please report them in the issue tracker.
-
-When reporting bugs, please include:
-- Commit hash of the version you are running.
-- Steps to reproduce the bug (if you can figure them out)
-- backtrace of the crash (if applicable)
-
-If you are too lazy to use the issue tracker, please at least ping `@outfoxxed:outfoxxed.me`
-in the [matrix room](https://matrix.to/#/#hy3-support:outfoxxed.me) with your bug information.
-
 ## Installation
 
 > [!IMPORTANT]
@@ -50,6 +26,42 @@ in the [matrix room](https://matrix.to/#/#hy3-support:outfoxxed.me) with your bu
 > To use hy3 against a release version of hyprland,
 > check out the matching hy3 tag for the hyprland version.
 > hy3 tags are formatted as `hl{version}` where `{version}` matches the release version of hyprland.
+
+### hyprpm
+Hyprland now has a dedicated plugin manager, which should be used when your package manager
+isn't capable of locking hy3 builds to the correct hyprland version.
+
+> [!IMPORTANT]
+> Make sure hyprpm is activated by putting
+>
+> ```conf
+> exec-once = hyprpm reload -n
+> ```
+>
+> in your hyprland.conf. (See [the wiki](https://wiki.hyprland.org/Plugins/Using-Plugins/) for details.)
+
+To install hy3 via hyprpm run
+
+```sh
+hyprpm add https://github.com/outfoxxed/hy3
+```
+
+To update hy3 (and all other plugins), run
+
+```sh
+hyprpm update
+```
+
+(See [the wiki](https://wiki.hyprland.org/Plugins/Using-Plugins/) for details.)
+
+> [!WARNING]
+> When you are running a tagged hyprland version hyprpm (0.34.0+) will build against hy3's
+> corrosponding release. However if you are running an untagged build (aka `-git`) hyprpm
+> will build against hy3's *latest* commit. This means **if you are running an out of date
+> untagged build of hyprland, hyprpm may pick an incompatible revision of hy3**.
+>
+> To fix this problem you will either need to update hyprland or manually build the correct
+> version of hy3.
 
 ### Nix
 #### Hyprland home manager module
@@ -111,41 +123,6 @@ wayland.windowManager.hyprland = {
 };
 ```
 
-### hyprpm
-Hyprland now has a dedicated plugin manager, which should be used when your package manager
-isn't capable of locking hy3 builds to the correct hyprland version.
-
-> [!IMPORTANT]
-> Make sure hyprpm is activated by putting
->
-> ```conf
-> exec-once = hyprpm reload -n
-> ```
->
-> in your hyprland.conf. (See [the wiki](https://wiki.hyprland.org/Plugins/Using-Plugins/) for details.)
-
-To install hy3 via hyprpm run
-
-```sh
-hyprpm add https://github.com/outfoxxed/hy3
-```
-
-To update hy3 (and all other plugins), run
-
-```sh
-hyprpm update
-```
-
-(See [the wiki](https://wiki.hyprland.org/Plugins/Using-Plugins/) for details.)
-
-> [!WARNING]
-> When you are running a tagged hyprland version hyprpm (0.34.0+) will build against hy3's
-> corrosponding release. However if you are running an untagged build (aka `-git`) hyprpm
-> will build against hy3's *latest* commit. This means **if you are running an out of date
-> untagged build of hyprland, hyprpm may pick an incompatible revision of hy3**.
->
-> To fix this problem you will either need to update hyprland or manually build the correct
-> version of hy3.
 
 ### Manual
 Install hyprland, including its headers and pkg-config file, then run the following commands:
@@ -159,33 +136,6 @@ The plugin will be located at `build/libhy3.so`, and you can load it normally
 (See [the hyprland wiki](https://wiki.hyprland.org/Plugins/Using-Plugins/#installing--using-plugins) for details.)
 
 Note that the hyprland headers and pkg-config file **MUST be installed correctly, for the target version of hyprland**.
-
-### Arch (AUR)
-
-> [!NOTE]
-> This method of installation is deprecated and you should use *hyprpm* instead,
-> as it is simpler and less error prone.
-
-> [!CAUTION]
-> Pacman is not very reliable when it comes to building packages in the correct order.
-> If you get a notification saying *hy3 was compiled for a different version of hyprland*
-> then your packages likely updated in the wrong order, or you have hyprland headers in `/usr/local`.
->
-> To fix this, remove `/usr/include/hyprland`, `/usr/local/include/hyprland`, `/usr/share/pkgconfig/hyprland.pc` and `/usr/local/share/pkgconfig/hyprland.pc`,
-> then reinstall hyprland and hy3.
->
-> If you know how to fix this please open an issue or pr, or message `@outfoxxed:outfoxxed.me` in the [matrix room](https://matrix.to/#/#hy3-support:outfoxxed.me).
-
-hy3 stable (for arch's `hyprland` package) is availible on the AUR as [hy3](https://aur.archlinux.org/packages/hy3).
-
-hy3-git (for `hyprland-git` on the AUR, unofficial package) is availible on the AUR as [hy3-git](https://aur.archlinux.org/packages/hy3-git).
-
-Both packages install hy3 as `/usr/lib/libhy3.so`.
-You can enable it in your hyprland configuration by adding the following line anywhere in your `hyprland.conf`
-
-```conf
-plugin = /usr/lib/libhy3.so
-```
 
 ## Configuration
 
@@ -224,8 +174,25 @@ plugin {
     # 2 = keep the nested group only if its parent is a tab group
     node_collapse_policy = <int> # default: 2
 
+    # policy controlling what windows will be focused using `hy3:movefocused`
+    # 0 = focus strictly by layout, don't attempt to skip windows that are obscured by another one
+    # 1 = do not focus windows which are entirely obscured by a floating window
+    # 2 = when `hy3:movefocus` layer is `samelayer` then use focus policy 0 (focus strictly by layout)
+    #     when `hy3:movefocus` layer is `all` then use focus policy 1 (don't focus obscured windows)
+    focus_obscured_windows_policy = <int> # default: 2
+
+    # which layers should be considered when changing focus with `hy3:movefocus`?
+    # samelayer = only focus windows on same layer as the source window (floating or tiled)
+    # all       = choose the closest window irrespective of the layout
+    # tiled     = only choose tiled windows, not especially useful but permitted by parser
+    # floating  = only choose floating windows, not especially useful but permitted by parser
+    default_movefocus_layer = <string>    # default: `samelayer`
+
     # offset from group split direction when only one window is in a group
     group_inset = <int> # default: 10
+
+    # scale factor of windows on the special workspace
+    special_scale_factor = <float> # default: 0.8
 
     # if a tab group will automatically be created for the first window spawned in a workspace
     tab_first_window = <bool>
@@ -344,8 +311,11 @@ plugin {
    - `require_hovered` - affect the tab group under the mouse. do nothing if none are hovered.
    - `wrap` - wrap to the opposite size of the tab bar if moving off the end
  - `hy3:debugnodes` - print the node tree into the hyprland log
+ - `hy3:resizenode, <vector>` - like Hyprland `resizeactive`, but applied to the whole focused group instead of just a window
  - :warning: **ALPHA QUALITY** `hy3:setswallow, <true | false | toggle>` - set the containing node's window swallow state
  - :warning: **ALPHA QUALITY** `hy3:expand, <expand | shrink | base>` - expand the current node to cover other nodes
    - `expand` - expand by one node
    - `shrink` - shrink by one node
    - `base` - undo all expansions
+
+

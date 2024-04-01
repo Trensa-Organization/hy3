@@ -1541,6 +1541,13 @@ void Hy3Layout::applyNodeDataToWindow(Hy3Node* node, bool no_animation) {
 		calcPos = calcPos + reserved_area.topLeft;
 		calcSize = calcSize - (reserved_area.topLeft + reserved_area.bottomRight);
 
+		if (g_pCompositor->isWorkspaceSpecial(window->m_iWorkspaceID)) {
+			// adjust for special workspaces
+			static const auto scalefactor = ConfigValue<Hyprlang::FLOAT>("plugin:hy3:special_scale_factor");  
+			calcPos = calcPos + (calcSize - calcSize * *scalefactor) / 2.f;
+			calcSize = calcSize * *scalefactor;
+		}
+
 		CBox wb = {calcPos, calcSize};
 		wb.round();
 
