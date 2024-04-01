@@ -1508,7 +1508,9 @@ Hy3Node* findTabBarAt(Hy3Node& node, Vector2D pos, Hy3Node** focused_node) {
 				for (auto& tab: tab_bar.bar.entries) {
 					if (child_iter == children.end()) break;
 
-					if (x > tab.offset.fl() * size.x && x < (tab.offset.fl() + tab.width.fl()) * size.x) {
+					if (x > tab.offset.value() * size.x
+					    && x < (tab.offset.value() + tab.width.value()) * size.x)
+					{
 						*focused_node = *child_iter;
 						return &node;
 					}
@@ -1864,9 +1866,10 @@ void Hy3Layout::applyNodeDataToWindow(Hy3Node* node, bool no_animation) {
 	if (node->data.type != Hy3NodeType::Window) return;
 	auto* window = node->data.as_window;
 	auto root_node = this->getWorkspaceRootGroup(window->m_iWorkspaceID);
-	if (root_node == nullptr) return;
 
 	CMonitor* monitor = nullptr;
+
+	auto* workspace = g_pCompositor->getWorkspaceByID(node->workspace_id);
 
 	if (g_pCompositor->isWorkspaceSpecial(node->workspace_id)) {
 		for (auto& m: g_pCompositor->m_vMonitors) {
@@ -1875,12 +1878,8 @@ void Hy3Layout::applyNodeDataToWindow(Hy3Node* node, bool no_animation) {
 				break;
 			}
 		}
-	}
-
-	if (monitor == nullptr) {
-		monitor = g_pCompositor->getMonitorFromID(
-		    g_pCompositor->getWorkspaceByID(node->workspace_id)->m_iMonitorID
-		);
+	} else {
+		monitor = g_pCompositor->getMonitorFromID(workspace->m_iMonitorID);
 	}
 
 	if (monitor == nullptr) {
@@ -1893,9 +1892,11 @@ void Hy3Layout::applyNodeDataToWindow(Hy3Node* node, bool no_animation) {
 		return;
 	}
 
+	const auto workspace_rule = g_pConfigManager->getWorkspaceRuleFor(workspace);
+
 	// clang-format off
 	static const auto gaps_in = ConfigValue<Hyprlang::CUSTOMTYPE, CCssGapData>("general:gaps_in");
-	static const auto single_window_no_gaps = ConfigValue<Hyprlang::INT>("plugin:hy3:no_gaps_when_only");
+	static const auto no_gaps_when_only = ConfigValue<Hyprlang::INT>("plugin:hy3:no_gaps_when_only");
 	// clang-format on
 
 	if (!g_pCompositor->windowExists(window) || !window->m_bIsMapped) {
@@ -1911,35 +1912,36 @@ void Hy3Layout::applyNodeDataToWindow(Hy3Node* node, bool no_animation) {
 		return;
 	}
 
-	window->m_vSize = node->size;
-	window->m_vPosition = node->position;
+	window->updateSpecialRenderData();
 
-	auto only_node = root_node->data.as_group.children.size() == 1
+	auto nodeBox = CBox(node->position, node->size);
+	nodeBox.round();
+
+	window->m_vSize = nodeBox.size();
+	window->m_vPosition = nodeBox.pos();
+
+	auto only_node = root_node != nullptr && root_node->data.as_group.children.size() == 1
 	              && root_node->data.as_group.children.front()->data.type == Hy3NodeType::Window;
 
 	if (!g_pCompositor->isWorkspaceSpecial(window->m_iWorkspaceID)
-	    && ((*single_window_no_gaps && (only_node || window->m_bIsFullscreen))
+	    && ((*no_gaps_when_only != 0 && (only_node || window->m_bIsFullscreen))
 	        || (window->m_bIsFullscreen
 	            && g_pCompositor->getWorkspaceByID(window->m_iWorkspaceID)->m_efFullscreenMode
 	                   == FULLSCREEN_FULL)))
 	{
-
-		CBox wb = {window->m_vPosition, window->m_vSize};
-		wb.round();
-
-		window->m_vRealPosition = wb.pos();
-		window->m_vRealSize = wb.size();
+		window->m_sSpecialRenderData.border = workspace_rule.border.value_or(*no_gaps_when_only == 2);
+		window->m_sSpecialRenderData.rounding = false;
+		window->m_sSpecialRenderData.shadow = false;
 
 		window->updateWindowDecos();
 
-		window->m_sSpecialRenderData.rounding = false;
-		window->m_sSpecialRenderData.border = false;
-		window->m_sSpecialRenderData.decorate = false;
-	} else {
-		window->m_sSpecialRenderData.rounding = true;
-		window->m_sSpecialRenderData.border = true;
-		window->m_sSpecialRenderData.decorate = true;
+		const auto reserved = window->getFullWindowReservedArea();
 
+		window->m_vRealPosition = window->m_vPosition + reserved.topLeft;
+		window->m_vRealSize = window->m_vSize - (reserved.topLeft + reserved.bottomRight);
+
+		g_pXWaylandManager->setWindowSize(window, window->m_vRealSize.goal());
+	} else {
 		auto calcPos = window->m_vPosition;
 		auto calcSize = window->m_vSize;
 
@@ -1968,7 +1970,7 @@ void Hy3Layout::applyNodeDataToWindow(Hy3Node* node, bool no_animation) {
 		window->m_vRealPosition = wb.pos();
 		window->m_vRealSize = wb.size();
 
-		g_pXWaylandManager->setWindowSize(window, calcSize);
+		g_pXWaylandManager->setWindowSize(window, wb.size());
 
 		if (no_animation) {
 			g_pHyprRenderer->damageWindow(window);
