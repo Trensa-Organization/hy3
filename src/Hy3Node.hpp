@@ -4,9 +4,10 @@ struct Hy3Node;
 struct Hy3GroupData;
 enum class Hy3GroupLayout;
 
-#include <list>
+#include <variant>
 
-#include <hyprland/src/Window.hpp>
+#include <hyprland/src/defines.hpp>
+#include <hyprland/src/desktop/Window.hpp>
 
 #include "Hy3Layout.hpp"
 #include "TabGroup.hpp"
@@ -47,7 +48,6 @@ struct Hy3GroupData {
 	void setLayout(Hy3GroupLayout layout);
 	void setEphemeral(GroupEphemeralityOption ephemeral);
 
-private:
 	Hy3GroupData(Hy3GroupData&&);
 	Hy3GroupData(const Hy3GroupData&) = delete;
 
@@ -56,26 +56,28 @@ private:
 
 class Hy3NodeData {
 public:
-	Hy3NodeType type;
-	union {
-		Hy3GroupData as_group;
-		CWindow* as_window;
-	};
-
-	Hy3NodeData();
-	Hy3NodeData(CWindow* window);
+	Hy3NodeData() = default;
+	Hy3NodeData(Hy3GroupData);
+	Hy3NodeData(PHLWINDOW window);
 	Hy3NodeData(Hy3GroupLayout layout);
-	~Hy3NodeData();
+	Hy3NodeData(Hy3NodeData&&);
+	~Hy3NodeData() = default;
 
-	Hy3NodeData& operator=(CWindow*);
+	Hy3NodeData& operator=(PHLWINDOW);
 	Hy3NodeData& operator=(Hy3GroupLayout);
+	Hy3NodeData& operator=(Hy3NodeData&&);
 
 	bool operator==(const Hy3NodeData&) const;
 
-	// private: - I give up, C++ wins
-	Hy3NodeData(Hy3GroupData);
-	Hy3NodeData(Hy3NodeData&&);
-	Hy3NodeData& operator=(Hy3NodeData&&);
+	bool valid() const;
+	Hy3NodeType type() const;
+	bool is_window() const;
+	bool is_group() const;
+	Hy3GroupData& as_group();
+	PHLWINDOW as_window();
+
+private:
+	std::variant<PHLWINDOWREF, Hy3GroupData> data;
 };
 
 struct Hy3Node {
@@ -87,15 +89,15 @@ struct Hy3Node {
 	Vector2D gap_topleft_offset;
 	Vector2D gap_bottomright_offset;
 	float size_ratio = 1.0;
-	int workspace_id = -1;
+	PHLWORKSPACE workspace = nullptr;
 	bool hidden = false;
 	Hy3Layout* layout = nullptr;
 
 	bool operator==(const Hy3Node&) const;
 
-	void focus();
+	void focus(bool warp);
 	void focusWindow();
-	CWindow* bringToTop();
+	PHLWINDOW bringToTop();
 	void markFocused();
 	void raiseToTop();
 	Hy3Node* getFocusedNode(bool ignore_group_focus = false, bool stop_at_expanded = false);
@@ -115,7 +117,7 @@ struct Hy3Node {
 	void setHidden(bool);
 
 	Hy3Node* findNodeForTabGroup(Hy3TabGroup&);
-	void appendAllWindows(std::vector<CWindow*>&);
+	void appendAllWindows(std::vector<PHLWINDOW>&);
 	std::string debugNode();
 
 	// Remove this node from its parent, deleting the parent if it was

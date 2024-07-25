@@ -2,56 +2,36 @@
 
 #include <cairo/cairo.h>
 #include <hyprland/src/Compositor.hpp>
-#include <hyprland/src/helpers/Box.hpp>
+#include <hyprland/src/desktop/DesktopTypes.hpp>
+#include <hyprland/src/desktop/Workspace.hpp>
 #include <hyprland/src/helpers/Color.hpp>
 #include <hyprland/src/render/OpenGL.hpp>
+#include <hyprland/src/render/Texture.hpp>
+#include <hyprutils/memory/SharedPtr.hpp>
+#include <hyprutils/math/Box.hpp>
 #include <pango/pangocairo.h>
 #include <pixman.h>
 
 #include "globals.hpp"
 
 Hy3TabBarEntry::Hy3TabBarEntry(Hy3TabBar& tab_bar, Hy3Node& node): tab_bar(tab_bar), node(node) {
-	this->focused.create(
-	    0.0f,
-	    g_pConfigManager->getAnimationPropertyConfig("fadeSwitch"),
-	    nullptr,
-	    AVARDAMAGE_NONE
-	);
+	this->focused
+	    .create(0.0f, g_pConfigManager->getAnimationPropertyConfig("fadeSwitch"), AVARDAMAGE_NONE);
 
-	this->urgent.create(
-	    0.0f,
-	    g_pConfigManager->getAnimationPropertyConfig("fadeSwitch"),
-	    nullptr,
-	    AVARDAMAGE_NONE
-	);
+	this->urgent
+	    .create(0.0f, g_pConfigManager->getAnimationPropertyConfig("fadeSwitch"), AVARDAMAGE_NONE);
 
-	this->offset.create(
-	    -1.0f,
-	    g_pConfigManager->getAnimationPropertyConfig("windowsMove"),
-	    nullptr,
-	    AVARDAMAGE_NONE
-	);
+	this->offset
+	    .create(-1.0f, g_pConfigManager->getAnimationPropertyConfig("windowsMove"), AVARDAMAGE_NONE);
 
-	this->width.create(
-	    -1.0f,
-	    g_pConfigManager->getAnimationPropertyConfig("windowsMove"),
-	    nullptr,
-	    AVARDAMAGE_NONE
-	);
+	this->width
+	    .create(-1.0f, g_pConfigManager->getAnimationPropertyConfig("windowsMove"), AVARDAMAGE_NONE);
 
-	this->vertical_pos.create(
-	    1.0f,
-	    g_pConfigManager->getAnimationPropertyConfig("windowsIn"),
-	    nullptr,
-	    AVARDAMAGE_NONE
-	);
+	this->vertical_pos
+	    .create(1.0f, g_pConfigManager->getAnimationPropertyConfig("windowsIn"), AVARDAMAGE_NONE);
 
-	this->fade_opacity.create(
-	    0.0f,
-	    g_pConfigManager->getAnimationPropertyConfig("windowsIn"),
-	    nullptr,
-	    AVARDAMAGE_NONE
-	);
+	this->fade_opacity
+	    .create(0.0f, g_pConfigManager->getAnimationPropertyConfig("windowsIn"), AVARDAMAGE_NONE);
 
 	this->focused.registerVar();
 	this->urgent.registerVar();
@@ -74,6 +54,8 @@ Hy3TabBarEntry::Hy3TabBarEntry(Hy3TabBar& tab_bar, Hy3Node& node): tab_bar(tab_b
 
 	this->vertical_pos = 0.0;
 	this->fade_opacity = 1.0;
+
+	this->texture = makeShared<CTexture>();
 }
 
 bool Hy3TabBarEntry::operator==(const Hy3Node& node) const { return this->node == node; }
@@ -139,7 +121,7 @@ void Hy3TabBarEntry::prepareTexture(float scale, CBox& box) {
 
 	auto rounding = std::min((double) *s_rounding * scale, std::min(width * 0.5, height * 0.5));
 
-	if (this->texture.m_iTexID == 0
+	if (this->texture->m_iTexID == 0
 	    // clang-format off
 			|| this->last_render.x != box.x
 			|| this->last_render.y != box.y
@@ -250,9 +232,9 @@ void Hy3TabBarEntry::prepareTexture(float scale, CBox& box) {
 		cairo_surface_flush(cairo_surface);
 
 		auto data = cairo_image_surface_get_data(cairo_surface);
-		this->texture.allocate();
+		this->texture->allocate();
 
-		glBindTexture(GL_TEXTURE_2D, this->texture.m_iTexID);
+		glBindTexture(GL_TEXTURE_2D, this->texture->m_iTexID);
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
 
@@ -266,17 +248,13 @@ void Hy3TabBarEntry::prepareTexture(float scale, CBox& box) {
 		cairo_destroy(cairo);
 		cairo_surface_destroy(cairo_surface);
 	} else {
-		glBindTexture(GL_TEXTURE_2D, this->texture.m_iTexID);
+		glBindTexture(GL_TEXTURE_2D, this->texture->m_iTexID);
 	}
 }
 
 Hy3TabBar::Hy3TabBar() {
-	this->fade_opacity.create(
-	    1.0f,
-	    g_pConfigManager->getAnimationPropertyConfig("windowsMove"),
-	    nullptr,
-	    AVARDAMAGE_NONE
-	);
+	this->fade_opacity
+	    .create(1.0f, g_pConfigManager->getAnimationPropertyConfig("windowsMove"), AVARDAMAGE_NONE);
 
 	this->fade_opacity.registerVar();
 	this->fade_opacity.setUpdateCallback([this](void*) { this->dirty = true; });
@@ -356,7 +334,7 @@ exitloop:
 
 		// set stats from node data
 		auto* parent = (*node)->parent;
-		auto& parent_group = parent->data.as_group;
+		auto& parent_group = parent->data.as_group();
 
 		entry->setFocused(
 		    parent_group.focused_child == *node
@@ -423,17 +401,9 @@ void Hy3TabBar::setSize(Vector2D size) {
 }
 
 Hy3TabGroup::Hy3TabGroup(Hy3Node& node) {
-	this->pos.create(
-	    g_pConfigManager->getAnimationPropertyConfig("windowsMove"),
-	    nullptr,
-	    AVARDAMAGE_NONE
-	);
+	this->pos.create(g_pConfigManager->getAnimationPropertyConfig("windowsMove"), AVARDAMAGE_NONE);
 
-	this->size.create(
-	    g_pConfigManager->getAnimationPropertyConfig("windowsMove"),
-	    nullptr,
-	    AVARDAMAGE_NONE
-	);
+	this->size.create(g_pConfigManager->getAnimationPropertyConfig("windowsMove"), AVARDAMAGE_NONE);
 
 	this->pos.registerVar();
 	this->size.registerVar();
@@ -449,7 +419,7 @@ void Hy3TabGroup::updateWithGroup(Hy3Node& node, bool warp) {
 	static const auto bar_height = ConfigValue<Hyprlang::INT>("plugin:hy3:tabs:height");
 
 	auto& gaps = node.parent == nullptr ? gaps_out : gaps_in;
-	auto tpos = node.position + Vector2D(gaps->left, gaps->top) + node.gap_topleft_offset;
+	auto tpos = node.position + Vector2D((int) gaps->left, (int) gaps->top) + node.gap_topleft_offset;
 
 	// clang-format off
 	auto tsize = Vector2D(
@@ -469,26 +439,54 @@ void Hy3TabGroup::updateWithGroup(Hy3Node& node, bool warp) {
 		if (warp) this->size.warp();
 	}
 
-	this->bar.updateNodeList(node.data.as_group.children);
+	this->bar.updateNodeList(node.data.as_group().children);
 	this->bar.updateAnimations(warp);
 
-	if (node.data.as_group.focused_child != nullptr) {
-		this->updateStencilWindows(*node.data.as_group.focused_child);
+	if (node.data.as_group().focused_child != nullptr) {
+		this->updateStencilWindows(*node.data.as_group().focused_child);
 	}
+}
+
+void damageBox(const Vector2D* position, const Vector2D* size) {
+	auto box = CBox {position->x, position->y, size->x, size->y};
+	g_pHyprRenderer->damageBox(&box);
 }
 
 void Hy3TabGroup::tick() {
 	static const auto enter_from_top = ConfigValue<Hyprlang::INT>("plugin:hy3:tabs:from_top");
 	static const auto padding = ConfigValue<Hyprlang::INT>("plugin:hy3:tabs:padding");
-	auto* workspace = g_pCompositor->getWorkspaceByID(this->workspace_id);
 
 	this->bar.tick();
 
-	if (workspace != nullptr) {
-		if (workspace->m_bHasFullscreenWindow) {
+	if (valid(this->workspace)) {
+		if (this->workspace->m_bHasFullscreenWindow) {
 			if (this->bar.fade_opacity.goal() != 0.0) this->bar.fade_opacity = 0.0;
 		} else {
 			if (this->bar.fade_opacity.goal() != 1.0) this->bar.fade_opacity = 1.0;
+		}
+
+		auto workspaceOffset = this->workspace->m_vRenderOffset.value();
+		if (this->last_workspace_offset != workspaceOffset) {
+			// First we damage the area where the bar was during the previous
+			// tick, cleaning up after ourselves
+			auto pos = this->last_pos + this->last_workspace_offset;
+			auto size = this->last_size;
+			damageBox(&pos, &size);
+
+			// Then we damage the current position of the bar, to avoid seeing
+			// glitches with animations disabled
+			pos = this->pos.value() + workspaceOffset;
+			size = this->size.value();
+			damageBox(&pos, &size);
+
+			this->bar.damaged = true;
+			this->last_workspace_offset = workspaceOffset;
+		}
+
+		if (this->workspace->m_fAlpha.isBeingAnimated()) {
+			auto pos = this->pos.value();
+			auto size = this->size.value();
+			damageBox(&pos, &size);
 		}
 	}
 
@@ -496,8 +494,7 @@ void Hy3TabGroup::tick() {
 	auto size = this->size.value();
 
 	if (this->last_pos != pos || this->last_size != size) {
-		CBox damage_box = {this->last_pos.x, this->last_pos.y, this->last_size.x, this->last_size.y};
-		g_pHyprRenderer->damageBox(&damage_box);
+		damageBox(&this->last_pos, &this->last_size);
 
 		this->bar.damaged = true;
 		this->last_pos = pos;
@@ -511,8 +508,7 @@ void Hy3TabGroup::tick() {
 			pos.y -= *padding;
 		}
 
-		CBox damage_box = {pos.x, pos.y, size.x, size.y};
-		g_pHyprRenderer->damageBox(&damage_box);
+		damageBox(&pos, &size);
 
 		this->bar.damaged = true;
 		this->bar.dirty = false;
@@ -525,20 +521,19 @@ void Hy3TabGroup::renderTabBar() {
 	static const auto padding = ConfigValue<Hyprlang::INT>("plugin:hy3:tabs:padding");
 
 	auto* monitor = g_pHyprOpenGL->m_RenderData.pMonitor;
-	auto* workspace = g_pCompositor->getWorkspaceByID(this->workspace_id);
 	auto scale = monitor->scale;
 
 	auto monitor_size = monitor->vecSize;
 	auto pos = this->pos.value() - monitor->vecPosition;
 	auto size = this->size.value();
 
-	if (workspace != nullptr) {
-		pos = pos + workspace->m_vRenderOffset.value();
+	if (valid(this->workspace)) {
+		pos = pos + this->workspace->m_vRenderOffset.value();
 	}
 
 	auto scaled_pos = Vector2D(std::round(pos.x * scale), std::round(pos.y * scale));
 	auto scaled_size = Vector2D(std::round(size.x * scale), std::round(size.y * scale));
-	wlr_box box = {scaled_pos.x, scaled_pos.y, scaled_size.x, scaled_size.y};
+	CBox box = {scaled_pos.x, scaled_pos.y, scaled_size.x, scaled_size.y};
 
 	// monitor size is not scaled
 	if (pos.x > monitor_size.x || pos.y > monitor_size.y || scaled_pos.x + scaled_size.x < 0
@@ -577,8 +572,9 @@ void Hy3TabGroup::renderTabBar() {
 
 		glColorMask(GL_FALSE, GL_FALSE, GL_FALSE, GL_FALSE);
 
-		for (auto* window: this->stencil_windows) {
-			if (!g_pCompositor->windowExists(window)) continue;
+		for (auto windowref: this->stencil_windows) {
+			if (!valid(windowref)) continue;
+			auto window = windowref.lock();
 
 			auto wpos = window->m_vRealPosition.value() - monitor->vecPosition;
 			auto wsize = window->m_vRealSize.value();
@@ -598,8 +594,8 @@ void Hy3TabGroup::renderTabBar() {
 		glStencilOp(GL_KEEP, GL_KEEP, GL_KEEP);
 	}
 
-	auto fade_opacity =
-	    this->bar.fade_opacity.value() * (workspace == nullptr ? 1.0 : workspace->m_fAlpha.value());
+	auto fade_opacity = this->bar.fade_opacity.value()
+	                  * (valid(this->workspace) ? this->workspace->m_fAlpha.value() : 1.0);
 
 	auto render_entry = [&](Hy3TabBarEntry& entry) {
 		Vector2D entry_pos = {
@@ -641,11 +637,11 @@ void Hy3TabGroup::renderTabBar() {
 	}
 }
 
-void findOverlappingWindows(Hy3Node& node, float height, std::vector<CWindow*>& windows) {
-	switch (node.data.type) {
-	case Hy3NodeType::Window: windows.push_back(node.data.as_window); break;
+void findOverlappingWindows(Hy3Node& node, float height, std::vector<PHLWINDOWREF>& windows) {
+	switch (node.data.type()) {
+	case Hy3NodeType::Window: windows.push_back(node.data.as_window()); break;
 	case Hy3NodeType::Group:
-		auto& group = node.data.as_group;
+		auto& group = node.data.as_group();
 
 		switch (group.layout) {
 		case Hy3GroupLayout::SplitH:

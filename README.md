@@ -79,7 +79,8 @@ Assuming you use hyprland's home manager module, you can easily integrate hy3 by
       inputs.nixpkgs.follows = "nixpkgs";
     };
 
-    hyprland.url = "github:hyprwm/Hyprland?ref=v{version}"; # where {version} is the hyprland release version
+    hyprland.url = "git+https://github.com/hyprwm/Hyprland?submodules=1&ref={version}";
+    # where {version} is the hyprland release version
     # or "github:hyprwm/Hyprland" to follow the development branch
 
     hy3 = {
@@ -123,6 +124,47 @@ wayland.windowManager.hyprland = {
 };
 ```
 
+### hyprpm
+Hyprland now has a dedicated plugin manager, which should be used when your package manager
+isn't capable of locking hy3 builds to the correct hyprland version.
+
+> [!IMPORTANT]
+> Make sure hyprpm is activated by putting
+>
+> ```conf
+> exec-once = hyprpm reload -n
+> ```
+>
+> in your hyprland.conf. (See [the wiki](https://wiki.hyprland.org/Plugins/Using-Plugins/) for details.)
+
+To install hy3 via hyprpm run
+
+```sh
+hyprpm add https://github.com/outfoxxed/hy3
+```
+
+To update hy3 (and all other plugins), run
+
+```sh
+hyprpm update
+```
+
+Sometimes the headers from hyprland are not updated, if this happens run (See [issue #109](https://github.com/outfoxxed/hy3/issues/109) for an example of where this happened)
+
+```sh
+hyprpm update -f
+```
+
+(See [the wiki](https://wiki.hyprland.org/Plugins/Using-Plugins/) for details.)
+
+> [!WARNING]
+> When you are running a tagged hyprland version hyprpm (0.34.0+) will build against hy3's
+> corrosponding release. However if you are running an untagged build (aka `-git`) hyprpm
+> will build against hy3's *latest* commit. This means **if you are running an out of date
+> untagged build of hyprland, hyprpm may pick an incompatible revision of hy3**.
+>
+> To fix this problem you will either need to update hyprland or manually build the correct
+> version of hy3.
 
 ### Manual
 Install hyprland, including its headers and pkg-config file, then run the following commands:
@@ -284,8 +326,11 @@ plugin {
    - `toggletab` will untab if group is tabbed, and tab if group is untabbed
    - `opposite` will toggle between horizontal and vertical layouts if the group is not tabbed.
  - `hy3:setephemeral, <true | false>` - change the ephemerality of the group the node belongs to
- - `hy3:movefocus, <l | u | d | r | left | down | up | right>, [visible]` - move the focus left, up, down, or right
+ - `hy3:movefocus, <l | u | d | r | left | down | up | right>, [visible], [warp | nowarp]` - move the focus left, up, down, or right
    - `visible` - only move between visible nodes, not hidden tabs
+   - `warp` - warp the mouse to the selected window, even if `general:no_cursor_warps` is true.
+   - `nowarp` - does not warp the mouse to the selected window, even if `general:no_cursor_warps` is false.
+ - `hy3:warpcursor` - warp the cursor to the center of the focused node
  - `hy3:movewindow, <l | u | d | r | left | down | up | right>, [once], [visible]` - move a window left, up, down, or right
    - `once` - only move directly to the neighboring group, without moving into any of its subgroups
    - `visible` - only move between visible nodes, not hidden tabs
