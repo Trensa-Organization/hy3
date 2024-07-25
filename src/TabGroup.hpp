@@ -15,7 +15,7 @@ class Hy3TabBar;
 struct Hy3TabBarEntry {
 	std::string window_title;
 	bool destroying = false;
-	CTexture texture;
+	SP<CTexture> texture;
 	CAnimatedVariable<float> focused;
 	CAnimatedVariable<float> urgent;
 	CAnimatedVariable<float> offset;       // 0.0-1.0 of total bar
@@ -85,8 +85,8 @@ private:
 
 class Hy3TabGroup {
 public:
-	CWindow* target_window = nullptr;
-	int workspace_id = -1;
+	PHLWINDOW target_window = nullptr;
+	PHLWORKSPACE workspace = nullptr;
 	bool hidden = false;
 	Hy3TabBar bar;
 	CAnimatedVariable<Vector2D> pos;
@@ -102,7 +102,8 @@ public:
 	void renderTabBar();
 
 private:
-	std::vector<CWindow*> stencil_windows;
+	std::vector<PHLWINDOWREF> stencil_windows;
+	Vector2D last_workspace_offset;
 	Vector2D last_pos;
 	Vector2D last_size;
 
